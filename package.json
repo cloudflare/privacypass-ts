@@ -1,0 +1,55 @@
+{
+    "name": "@cloudflare/privacypass-ts",
+    "version": "0.1.0",
+    "description": "privacypass-ts: A TypeScript Library for the Privacy Pass Issuance Protocol",
+    "author": "Armando Faz <armfazh@cloudflare.com>",
+    "contributors": [
+        "Armando Faz <armfazh@cloudflare.com>"
+    ],
+    "license": "Apache-2.0",
+    "private": false,
+    "type": "module",
+    "main": "./lib/src/index.js",
+    "module": "./lib/src/index.js",
+    "types": "./lib/src/index.d.ts",
+    "files": [
+        "lib/src/**/*.!(tsbuildinfo)"
+    ],
+    "keywords": [
+        "crypto",
+        "cryptography",
+        "privacypass",
+        "token"
+    ],
+    "homepage": "https://github.com/cloudflare/privacypass-ts#readme",
+    "repository": "github:cloudflare/privacypass-ts",
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "build": "tsc -b",
+        "test": "tsc -b test && node --experimental-vm-modules node_modules/jest/bin/jest.js --ci",
+        "lint": "eslint .",
+        "format": "prettier './(src|test|bench|examples)/*.ts' --write",
+        "bench": "tsc -b bench && node ./lib/bench/index.js",
+        "examples": "tsc -b examples && node ./lib/examples/index.js",
+        "clean": "rimraf lib coverage dist"
+    },
+    "devDependencies": {
+        "@types/benchmark": "2.1.2",
+        "@types/jest": "29.5.3",
+        "@typescript-eslint/eslint-plugin": "5.60.0",
+        "@typescript-eslint/parser": "5.60.0",
+        "benchmark": "2.1.4",
+        "eslint": "8.44.0",
+        "eslint-config-prettier": "8.8.0",
+        "eslint-plugin-jest": "27.2.2",
+        "eslint-plugin-jest-formatting": "3.1.0",
+        "eslint-plugin-prettier": "5.0.0",
+        "eslint-plugin-security": "1.7.1",
+        "jest": "29.6.1",
+        "prettier": "3.0.0",
+        "rimraf": "5.0.1",
+        "typescript": "5.1.6"
+    }
+}

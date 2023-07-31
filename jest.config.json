@@ -1,0 +1,15 @@
+{
+    "moduleFileExtensions": [
+        "js"
+    ],
+    "testEnvironment": "node",
+    "transform": {},
+    "setupFiles": [
+        "./test/jest.setup-file.js"
+    ],
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+        "!**/*.json"
+    ],
+    "verbose": true
+}
