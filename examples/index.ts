@@ -8,7 +8,7 @@ if (typeof crypto === 'undefined') {
 }
 
 async function examples() {
-    console.log("examples here")
+    console.log('examples here');
 }
 
 examples().catch((e: Error) => {
