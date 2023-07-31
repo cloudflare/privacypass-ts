@@ -1,11 +1,30 @@
 import { Buffer } from 'buffer';
-import { base64, base64url } from 'rfc4648';
+import { base64url } from 'rfc4648';
+
+export interface TokenTypeEntry {
+    name: string;
+    value: number;
+    Nk: number;
+    Nid: number;
+    publicVerifiable: boolean;
+    publicMetadata: boolean;
+    privateMetadata: boolean;
+}
 
 export class TokenChallenge {
+    // This class represents the following structure:
+    //
+    // struct {
+    //     uint16_t token_type;
+    //     opaque issuer_name<1..2^16-1>;
+    //     opaque redemption_context<0..32>;
+    //     opaque origin_info<0..2^16-1>;
+    // } TokenChallenge;
+
     constructor(
         public tokenType: number,
         public issuerName: string,
-        public redemptionNonce: Uint8Array,
+        public redemptionContext: Uint8Array,
         public originInfo: string[],
     ) {}
 
@@ -23,7 +42,7 @@ export class TokenChallenge {
 
         len = input.readUInt8(offset);
         offset += 1;
-        const redemptionNonce = new Uint8Array(input.subarray(offset, offset + len));
+        const redemptionContext = new Uint8Array(input.subarray(offset, offset + len));
         offset += len;
 
         len = input.readUint16BE(offset);
@@ -31,7 +50,7 @@ export class TokenChallenge {
         const allOriginInfo = input.subarray(offset, offset + len).toString();
         const originInfo = allOriginInfo.split(',');
 
-        return new TokenChallenge(type, issuerName, redemptionNonce, originInfo);
+        return new TokenChallenge(type, issuerName, redemptionContext, originInfo);
     }
 
     serialize(): Uint8Array {
@@ -49,10 +68,10 @@ export class TokenChallenge {
         output.push(b);
 
         b = Buffer.alloc(1);
-        b.writeUint8(this.redemptionNonce.length);
+        b.writeUint8(this.redemptionContext.length);
         output.push(b);
 
-        b = Buffer.from(this.redemptionNonce);
+        b = Buffer.from(this.redemptionContext);
         output.push(b);
 
         const allOriginInfo = this.originInfo.join(',');
@@ -67,81 +86,115 @@ export class TokenChallenge {
     }
 }
 
-// WWW-Authenticate authorization challenge attributes
-const authorizationAttributeChallenge = 'challenge';
-const authorizationAttributeMaxAge = 'max-age';
-const authorizationAttributeTokenKey = 'token-key';
-// const authorizationAttributeNameKey = "origin-name-key"
-
-export interface TokenDetails {
-    type: number;
-    attester: string;
-    challenge: Uint8Array;
-    publicKeyEncoded: Uint8Array;
+export interface PrivateToken {
+    challenge: TokenChallenge; // contains a TokenChallenge.
+    challengeSerialized: Uint8Array; // contains a serialized version of the TokenChallenge value.
+    tokenKey: Uint8Array; //  contains a base64url encoding of the public key for issuance.
+    maxAge: number | undefined; // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
 }
 
-function tryB64UrlToUint8(x: string): Uint8Array {
-    let bytes: Uint8Array;
-    try {
-        bytes = base64url.parse(x);
-    } catch (_) {
-        try {
-            bytes = base64.parse(x);
-        } catch (_) {
-            return new Uint8Array();
+export function parsePrivateToken(data: string): PrivateToken {
+    // Consumes data:
+    //   challenge="abc...", token-key="123..."
+
+    const attributes = data.split(',');
+    const pt: Partial<PrivateToken> = {};
+
+    for (const attr of attributes) {
+        let [attrKey, attrValue] = attr.split('=', 2);
+        attrKey = attrKey.trim();
+        attrValue = attrValue.trim();
+
+        switch (attrKey) {
+            case 'challenge':
+                pt.challengeSerialized = base64url.parse(attrValue);
+                pt.challenge = TokenChallenge.parse(pt.challengeSerialized);
+                break;
+            case 'token-key':
+                pt.tokenKey = base64url.parse(attrValue);
+                break;
+            case 'max-age':
+                pt.maxAge = parseInt(attrValue);
+                break;
         }
     }
-    return bytes;
+
+    if (
+        pt.challengeSerialized === undefined ||
+        pt.challenge === undefined ||
+        pt.tokenKey === undefined
+    ) {
+        throw new Error('cannot parse PrivateToken');
+    }
+
+    return pt as PrivateToken;
 }
 
-export function parseWWWAuthHeader(header: string): TokenDetails[] {
+export function parsePrivateTokens(header: string): PrivateToken[] {
+    // Consumes data:
+    //   PrivateToken challenge="abc...", token-key="123...",
+    //   PrivateToken challenge="def...", token-key="234..."
+
     const challenges = header.split('PrivateToken ');
-    const allTokenDetails = new Array<TokenDetails>();
+    const listTokens = new Array<PrivateToken>();
 
     for (const challenge of challenges) {
         if (challenge.length === 0) {
             continue;
         }
 
-        const attributes = challenge.split(',');
-        let challengeBlob = new Uint8Array();
-        let tokenKeyEnc = new Uint8Array();
-
-        // parse attributes of a challenge
-        for (const attribute of attributes) {
-            let [attrKey, attrValue] = attribute.split('=', 2);
-            attrKey = attrKey.trim();
-            attrValue = attrValue.trim();
-
-            switch (attrKey) {
-                case authorizationAttributeChallenge:
-                    challengeBlob = tryB64UrlToUint8(attrValue);
-                    break;
-                case authorizationAttributeTokenKey:
-                    tokenKeyEnc = tryB64UrlToUint8(attrValue);
-                    break;
-                case authorizationAttributeMaxAge:
-                    // not used now
-                    break;
-            }
-        }
-
-        if (challengeBlob.length === 0) {
-            continue;
-        }
-
-        // Determine type of token
-        const type = (challengeBlob[0] << 8) | challengeBlob[1];
-        const attester = 'attester.example:4569';
-        const details: TokenDetails = {
-            type,
-            attester,
-            challenge: new Uint8Array(challengeBlob),
-            publicKeyEncoded: new Uint8Array(tokenKeyEnc),
-        };
-
-        allTokenDetails.push(details);
+        const privToken = parsePrivateToken(challenge);
+        listTokens.push(privToken);
     }
 
-    return allTokenDetails;
+    return listTokens;
+}
+
+export class TokenPayload {
+    constructor(
+        public tokenType: number,
+        public nonce: Uint8Array,
+        public challengeDigest: Uint8Array,
+        public tokenKeyId: Uint8Array,
+    ) {}
+
+    serialize(): Uint8Array {
+        const output = new Array<Buffer>();
+
+        let b = Buffer.alloc(2);
+        b.writeUint16BE(this.tokenType);
+        output.push(b);
+
+        b = Buffer.from(this.nonce);
+        output.push(b);
+
+        b = Buffer.from(this.challengeDigest);
+        output.push(b);
+
+        b = Buffer.from(this.tokenKeyId);
+        output.push(b);
+
+        return new Uint8Array(Buffer.concat(output));
+    }
+}
+
+export class Token {
+    // This class represents the Token structure (composed by a TokenPayload and an authenticator).
+    //
+    // struct {
+    //     uint16_t token_type;
+    //     uint8_t nonce[32];
+    //     uint8_t challenge_digest[32];
+    //     uint8_t token_key_id[Nid];
+    //     uint8_t authenticator[Nk];
+    // } Token;
+
+    constructor(
+        public payload: TokenPayload,
+        public authenticator: Uint8Array,
+    ) {}
+
+    serialize(): Uint8Array {
+        return new Uint8Array(Buffer.concat([this.payload.serialize(), this.authenticator]));
+    }
 }

@@ -1,10 +1,12 @@
-import { PublicVerifClient, PublicVerifIssuer } from '../src/pubVerifToken';
-
 import { jest } from '@jest/globals';
 import { base64 } from 'rfc4648';
 
-import vectors from './testdata/public_verif_token.json';
-import { convertPSSToEnc } from '../src/util';
+import { Client, Issuer } from '../src/pubVerifToken.js';
+import { convertPSSToEnc } from '../src/util.js';
+import { TokenChallenge, PrivateToken } from '../src/httpAuthScheme.js';
+
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-test-vectors
+import vectors from './testdata/publicverif_v11.json';
 
 function hexToUint8(x: string): Uint8Array {
     return new Uint8Array(Buffer.from(x, 'hex'));
@@ -55,7 +57,15 @@ describe.each(vectors)('PublicVerifToken', (v: Vectors) => {
         const salt = hexToUint8(v.salt);
         const nonce = hexToUint8(v.nonce);
         const blind = hexToUint8(v.blind);
-        const challenge = hexToUint8(v.challenge);
+        const challengeSerialized = hexToUint8(v.challenge);
+        const challenge = TokenChallenge.parse(challengeSerialized);
+
+        const privToken: PrivateToken = {
+            challenge,
+            challengeSerialized,
+            tokenKey: publicKeyEnc,
+            maxAge: undefined,
+        };
 
         // Mock for randomized operations.
         jest.spyOn(crypto, 'getRandomValues')
@@ -63,12 +73,12 @@ describe.each(vectors)('PublicVerifToken', (v: Vectors) => {
             .mockReturnValueOnce(salt)
             .mockReturnValueOnce(blind);
 
-        const client = new PublicVerifClient(publicKey, publicKeyEnc);
-        const tokReq = await client.createTokenRequest(challenge);
+        const client = new Client();
+        const tokReq = await client.createTokenRequest(privToken);
         const tokReqSer = tokReq.serialize();
         expect(uint8ToHex(tokReqSer)).toStrictEqual(v.token_request);
 
-        const tokRes = await PublicVerifIssuer.issue(privateKey, tokReq);
+        const tokRes = await Issuer.issue(privateKey, tokReq);
         const tokResSer = tokRes.serialize();
         expect(tokResSer).toStrictEqual(hexToUint8(v.token_response));
 
