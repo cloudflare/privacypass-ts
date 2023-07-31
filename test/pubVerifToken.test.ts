@@ -48,8 +48,8 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
     return [{ privateKey, publicKey }, publicKeyEnc];
 }
 
-describe.each(vectors)('PublicVerifToken', (v: Vectors) => {
-    test('test-vector', async () => {
+describe.each(vectors)('Test vector %#', (v: Vectors) => {
+    test('Public Verifiable', async () => {
         const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
         expect(privateKey).toBeDefined();
         expect(publicKey).toBeDefined();
@@ -57,7 +57,7 @@ describe.each(vectors)('PublicVerifToken', (v: Vectors) => {
         const salt = hexToUint8(v.salt);
         const nonce = hexToUint8(v.nonce);
         const blind = hexToUint8(v.blind);
-        const challengeSerialized = hexToUint8(v.challenge);
+        const challengeSerialized = hexToUint8(v.token_challenge);
         const challenge = TokenChallenge.parse(challengeSerialized);
 
         const privToken: PrivateToken = {
