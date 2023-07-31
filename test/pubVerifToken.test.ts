@@ -48,42 +48,40 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
     return [{ privateKey, publicKey }, publicKeyEnc];
 }
 
-describe.each(vectors)('Test vector %#', (v: Vectors) => {
-    test('Public Verifiable', async () => {
-        const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
-        expect(privateKey).toBeDefined();
-        expect(publicKey).toBeDefined();
+test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
+    const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
+    expect(privateKey).toBeDefined();
+    expect(publicKey).toBeDefined();
 
-        const salt = hexToUint8(v.salt);
-        const nonce = hexToUint8(v.nonce);
-        const blind = hexToUint8(v.blind);
-        const challengeSerialized = hexToUint8(v.token_challenge);
-        const challenge = TokenChallenge.parse(challengeSerialized);
+    const salt = hexToUint8(v.salt);
+    const nonce = hexToUint8(v.nonce);
+    const blind = hexToUint8(v.blind);
+    const challengeSerialized = hexToUint8(v.token_challenge);
+    const challenge = TokenChallenge.parse(challengeSerialized);
 
-        const privToken: PrivateToken = {
-            challenge,
-            challengeSerialized,
-            tokenKey: publicKeyEnc,
-            maxAge: undefined,
-        };
+    const privToken: PrivateToken = {
+        challenge,
+        challengeSerialized,
+        tokenKey: publicKeyEnc,
+        maxAge: undefined,
+    };
 
-        // Mock for randomized operations.
-        jest.spyOn(crypto, 'getRandomValues')
-            .mockReturnValueOnce(nonce)
-            .mockReturnValueOnce(salt)
-            .mockReturnValueOnce(blind);
+    // Mock for randomized operations.
+    jest.spyOn(crypto, 'getRandomValues')
+        .mockReturnValueOnce(nonce)
+        .mockReturnValueOnce(salt)
+        .mockReturnValueOnce(blind);
 
-        const client = new Client();
-        const tokReq = await client.createTokenRequest(privToken);
-        const tokReqSer = tokReq.serialize();
-        expect(uint8ToHex(tokReqSer)).toStrictEqual(v.token_request);
+    const client = new Client();
+    const tokReq = await client.createTokenRequest(privToken);
+    const tokReqSer = tokReq.serialize();
+    expect(uint8ToHex(tokReqSer)).toStrictEqual(v.token_request);
 
-        const tokRes = await Issuer.issue(privateKey, tokReq);
-        const tokResSer = tokRes.serialize();
-        expect(tokResSer).toStrictEqual(hexToUint8(v.token_response));
+    const tokRes = await Issuer.issue(privateKey, tokReq);
+    const tokResSer = tokRes.serialize();
+    expect(tokResSer).toStrictEqual(hexToUint8(v.token_response));
 
-        const token = await client.finalize(tokRes);
-        const tokenSer = token.serialize();
-        expect(tokenSer).toStrictEqual(hexToUint8(v.token));
-    });
+    const token = await client.finalize(tokRes);
+    const tokenSer = token.serialize();
+    expect(tokenSer).toStrictEqual(hexToUint8(v.token));
 });

@@ -1,0 +1,52 @@
+[
+    {
+        "comment": "//   token_type(0002), issuer_name(issuer.example),\n//   origin_info(origin.example), redemption_context(non-empty)",
+        "token_type": "0002",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "6f726967696e2e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "0002e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab8e1d5518ec82964255526efd8f9db88205a8ddd3ffb1db298fcc3ad36c42388fca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(0002), issuer_name(issuer.example),\n//   origin_info(origin.example), redemption_context(empty)",
+        "token_type": "0002",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "",
+        "origin_info": "6f726967696e2e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "0002e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab11e15c91a7c2ad02abd66645802373db1d823bea80f08d452541fb2b62b5898bca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(0002), issuer_name(issuer.example),\n//   origin_info(), redemption_context(empty)",
+        "token_type": "0002",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "",
+        "origin_info": "",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "0002e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688ababb741ec1b6fd05f1e95f8982906aec1612896d9ca97d53eef94ad3c9fe023f7a4ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(0002), issuer_name(issuer.example),\n//   origin_info(), redemption_context(non-empty)",
+        "token_type": "0002",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "0002e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688ababb85fb5bc06edeb0e8e8bdb5b3bea8c4fa40837c82e8bcaf5882c81e14817ea18ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(0002), issuer_name(issuer.example),\n//   origin_info(foo.example,bar.example),\n//   redemption_context(non-empty)",
+        "token_type": "0002",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "666f6f2e6578616d706c652c6261722e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "0002e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688ababa2a775866b6ae0f98944910c8f48728d8a2735b9157762ddbf803f70e2e8ba3eca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    }
+]

@@ -60,11 +60,14 @@ export class TokenChallenge {
         b.writeUint16BE(this.tokenType);
         output.push(b);
 
+        const te = new TextEncoder();
+        const issuerNameBytes = te.encode(this.issuerName);
+
         b = Buffer.alloc(2);
-        b.writeUint16BE(this.issuerName.length);
+        b.writeUint16BE(issuerNameBytes.length);
         output.push(b);
 
-        b = Buffer.from(this.issuerName);
+        b = Buffer.from(issuerNameBytes);
         output.push(b);
 
         b = Buffer.alloc(1);
@@ -75,11 +78,13 @@ export class TokenChallenge {
         output.push(b);
 
         const allOriginInfo = this.originInfo.join(',');
+        const allOriginInfoBytes = te.encode(allOriginInfo);
+
         b = Buffer.alloc(2);
-        b.writeUint16BE(allOriginInfo.length);
+        b.writeUint16BE(allOriginInfoBytes.length);
         output.push(b);
 
-        b = Buffer.from(allOriginInfo);
+        b = Buffer.from(allOriginInfoBytes);
         output.push(b);
 
         return new Uint8Array(Buffer.concat(output));
