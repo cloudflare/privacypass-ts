@@ -1,3 +1,6 @@
+// Copyright (c) 2023 Cloudflare, Inc.
+// Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
+
 import { TokenType as PubTokenType, fetchPublicVerifToken } from './pubVerifToken.js';
 import { parsePrivateTokens } from './httpAuthScheme.js';
 import { base64url } from 'rfc4648';
