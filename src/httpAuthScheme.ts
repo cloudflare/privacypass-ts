@@ -106,7 +106,10 @@ export function parsePrivateToken(data: string): PrivateToken {
     const pt: Partial<PrivateToken> = {};
 
     for (const attr of attributes) {
-        let [attrKey, attrValue] = attr.split('=', 2);
+        const idx = attr.indexOf('=');
+        let attrKey = attr.substring(0, idx);
+        let attrValue = attr.substring(idx + 1);
+        attrValue = attrValue.replaceAll('"', '');
         attrKey = attrKey.trim();
         attrValue = attrValue.trim();
 
