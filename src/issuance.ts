@@ -29,14 +29,22 @@ export interface IssuerConfig {
 
 // Fetch defaut issuer configuration.
 export async function getIssuerUrl(issuerName: string): Promise<string> {
-    const configURI = 'https://' + issuerName + PRIVATE_TOKEN_ISSUER_DIRECTORY;
+    const baseURL = `https://${issuerName}`;
+    const configURI = `${baseURL}${PRIVATE_TOKEN_ISSUER_DIRECTORY}`;
     const res = await fetch(configURI);
     if (res.status !== 200) {
         throw new Error(`issuerConfig: no configuration was found at ${configURI}`);
     }
 
     const response: IssuerConfig = await res.json();
-    return response['issuer-request-uri'];
+    const uri = response['issuer-request-uri'];
+    try {
+        // assess is valid URL
+        new URL(uri);
+        return uri;
+    } catch (_) {
+        return `${baseURL}${uri}`;
+    }
 }
 
 export interface TokenRequestProtocol {
