@@ -4,20 +4,13 @@
 import { jest } from '@jest/globals';
 import { base64 } from 'rfc4648';
 
-import { Client, Issuer } from '../src/pubVerifToken.js';
+import { Client, Issuer, TokenRequest, TokenResponse, TokenType } from '../src/pubVerifToken.js';
 import { convertPSSToEnc } from '../src/util.js';
-import { TokenChallenge, PrivateToken } from '../src/httpAuthScheme.js';
+import { TokenChallenge, PrivateToken, Token } from '../src/httpAuthScheme.js';
+import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-test-vectors
 import vectors from './testdata/publicverif_v11.json';
-
-function hexToUint8(x: string): Uint8Array {
-    return new Uint8Array(Buffer.from(x, 'hex'));
-}
-
-function uint8ToHex(x: Uint8Array): string {
-    return Buffer.from(x).toString('hex');
-}
 
 type Vectors = (typeof vectors)[number];
 
@@ -60,7 +53,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const nonce = hexToUint8(v.nonce);
     const blind = hexToUint8(v.blind);
     const challengeSerialized = hexToUint8(v.token_challenge);
-    const challenge = TokenChallenge.parse(challengeSerialized);
+    const challenge = TokenChallenge.deserialize(challengeSerialized);
 
     const privToken: PrivateToken = {
         challenge,
@@ -77,14 +70,20 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
 
     const client = new Client();
     const tokReq = await client.createTokenRequest(privToken);
+    testSerialize(TokenRequest, tokReq);
+
     const tokReqSer = tokReq.serialize();
-    expect(uint8ToHex(tokReqSer)).toStrictEqual(v.token_request);
+    expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
 
     const tokRes = await Issuer.issue(privateKey, tokReq);
+    testSerialize(TokenResponse, tokRes);
+
     const tokResSer = tokRes.serialize();
-    expect(tokResSer).toStrictEqual(hexToUint8(v.token_response));
+    expect(uint8ToHex(tokResSer)).toBe(v.token_response);
 
     const token = await client.finalize(tokRes);
+    testSerializeType(TokenType, Token, token);
+
     const tokenSer = token.serialize();
-    expect(tokenSer).toStrictEqual(hexToUint8(v.token));
+    expect(uint8ToHex(tokenSer)).toBe(v.token);
 });

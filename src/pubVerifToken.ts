@@ -2,10 +2,9 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { SUITES } from '@cloudflare/blindrsa-ts';
-import { Buffer } from 'buffer';
 
 import { TokenTypeEntry, PrivateToken, TokenPayload, Token } from './httpAuthScheme.js';
-import { convertPSSToEnc } from './util.js';
+import { convertPSSToEnc, joinAll } from './util.js';
 import {
     sendTokenRequest,
     getIssuerUrl,
@@ -24,32 +23,68 @@ export const TokenType: TokenTypeEntry = {
 } as const;
 
 export class TokenRequest implements TokenRequestProtocol {
+    tokenType: number;
     constructor(
-        public tokenType: number,
         public tokenKeyId: number,
         public blindedMsg: Uint8Array,
-    ) {}
+    ) {
+        if (blindedMsg.length !== TokenType.Nk) {
+            throw new Error('invalid blinded message size');
+        }
+
+        this.tokenType = TokenType.value;
+    }
+
+    static deserialize(bytes: Uint8Array): TokenRequest {
+        let offset = 0;
+        const input = new DataView(bytes.buffer);
+
+        const type = input.getUint16(offset);
+        offset += 2;
+
+        if (type !== TokenType.value) {
+            throw new Error('mismatch of token type');
+        }
+
+        const tokenKeyId = input.getUint8(offset);
+        offset += 1;
+
+        const len = TokenType.Nk;
+        const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
+        offset += len;
+
+        return new TokenRequest(tokenKeyId, blindedMsg);
+    }
 
     serialize(): Uint8Array {
-        const output = new Array<Buffer>();
+        const output = new Array<ArrayBuffer>();
 
-        let b = Buffer.alloc(2);
-        b.writeUint16BE(this.tokenType);
+        let b = new ArrayBuffer(2);
+        new DataView(b).setUint16(0, this.tokenType);
         output.push(b);
 
-        b = Buffer.alloc(1);
-        b.writeUint8(this.tokenKeyId);
+        b = new ArrayBuffer(1);
+        new DataView(b).setUint8(0, this.tokenKeyId);
         output.push(b);
 
-        b = Buffer.from(this.blindedMsg);
+        b = this.blindedMsg.buffer;
         output.push(b);
 
-        return new Uint8Array(Buffer.concat(output));
+        return new Uint8Array(joinAll(output));
     }
 }
 
 export class TokenResponse implements TokenResponseProtocol {
-    constructor(public blindSig: Uint8Array) {}
+    constructor(public blindSig: Uint8Array) {
+        if (blindSig.length !== TokenType.Nk) {
+            throw new Error('invalid blind signature size');
+        }
+    }
+
+    static deserialize(bytes: Uint8Array): TokenResponse {
+        return new TokenResponse(bytes.slice(0, TokenType.Nk));
+    }
+
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
     }
@@ -80,7 +115,7 @@ export class Client {
             await crypto.subtle.digest('SHA-256', privToken.challengeSerialized),
         );
         const keyId = new Uint8Array(await crypto.subtle.digest('SHA-256', privToken.tokenKey));
-        const tokenPayload = new TokenPayload(Client.TYPE.value, nonce, context, keyId);
+        const tokenPayload = new TokenPayload(Client.TYPE, nonce, context, keyId);
         const tokenInput = tokenPayload.serialize();
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
@@ -95,7 +130,7 @@ export class Client {
 
         const { blindedMsg, inv } = await blindRSA.blind(publicKeyIssuer, tokenInput);
         const tokenKeyId = keyId[keyId.length - 1];
-        const tokenRequest = new TokenRequest(Client.TYPE.value, tokenKeyId, blindedMsg);
+        const tokenRequest = new TokenRequest(tokenKeyId, blindedMsg);
         this.finData = { tokenInput, tokenPayload, inv, tokenRequest, publicKeyIssuer };
 
         return tokenRequest;
@@ -113,7 +148,7 @@ export class Client {
             t.blindSig,
             this.finData.inv,
         );
-        const token = new Token(this.finData.tokenPayload, authenticator);
+        const token = new Token(Client.TYPE, this.finData.tokenPayload, authenticator);
         this.finData = undefined;
 
         return token;
