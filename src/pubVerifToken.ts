@@ -155,6 +155,15 @@ export class Client {
     }
 }
 
+export function verifyToken(publicKey: CryptoKey, token: Token): Promise<boolean> {
+    return crypto.subtle.verify(
+        { name: 'RSA-PSS', saltLength: 48 },
+        publicKey,
+        token.authenticator,
+        token.payload.serialize(),
+    );
+}
+
 export async function fetchPublicVerifToken(pt: PrivateToken): Promise<Token> {
     const issuerUrl = await getIssuerUrl(pt.challenge.issuerName);
     const client = new Client();

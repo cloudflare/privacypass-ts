@@ -4,7 +4,14 @@
 import { jest } from '@jest/globals';
 import { base64 } from 'rfc4648';
 
-import { Client, Issuer, TokenRequest, TokenResponse, TokenType } from '../src/pubVerifToken.js';
+import {
+    Client,
+    Issuer,
+    TokenRequest,
+    TokenResponse,
+    TokenType,
+    verifyToken,
+} from '../src/pubVerifToken.js';
 import { convertPSSToEnc } from '../src/util.js';
 import { TokenChallenge, PrivateToken, Token } from '../src/httpAuthScheme.js';
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
@@ -86,4 +93,6 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
 
     const tokenSer = token.serialize();
     expect(uint8ToHex(tokenSer)).toBe(v.token);
+
+    expect(await verifyToken(publicKey, token)).toBe(true);
 });
