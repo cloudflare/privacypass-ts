@@ -20,8 +20,7 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
 
     const issuerName = hexToString(v.issuer_name);
     const redemptionContext = hexToUint8(v.redemption_context);
-    const originInfoAll = hexToString(v.origin_info);
-    const originInfo = originInfoAll.split(',');
+    const originInfo = v.origin_info !== '' ? hexToString(v.origin_info).split(',') : undefined;
     const nonce = hexToUint8(v.nonce);
     const keyId = hexToUint8(v.token_key_id);
 

@@ -2,7 +2,7 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { TokenType as PubTokenType, fetchPublicVerifToken } from './pubVerifToken.js';
-import { parsePrivateTokens } from './httpAuthScheme.js';
+import { parsePrivateTokens, TokenChallenge } from './httpAuthScheme.js';
 import { base64url } from 'rfc4648';
 
 export async function header_to_token(header: string): Promise<string | null> {
@@ -26,3 +26,5 @@ export async function header_to_token(header: string): Promise<string | null> {
     }
     return null;
 }
+
+export { TokenChallenge };

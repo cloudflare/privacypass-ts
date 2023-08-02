@@ -25,11 +25,27 @@ export class TokenChallenge {
     // } TokenChallenge;
 
     constructor(
-        public tokenType: number,
-        public issuerName: string,
-        public redemptionContext: Uint8Array,
-        public originInfo: string[],
-    ) {}
+        public readonly tokenType: number,
+        public readonly issuerName: string,
+        public readonly redemptionContext: Uint8Array,
+        public readonly originInfo?: string[],
+    ) {
+        const MAX_UINT16 = (1 << 16) - 1;
+        if (issuerName.length > MAX_UINT16) {
+            throw new Error('invalid issuer name size');
+        }
+
+        if (originInfo) {
+            const allOriginInfo = originInfo.join(',');
+            if (allOriginInfo.length > MAX_UINT16) {
+                throw new Error('invalid origin info size');
+            }
+        }
+
+        if (!(redemptionContext.length == 0 || redemptionContext.length == 32)) {
+            throw new Error('invalid redemptionContext size');
+        }
+    }
 
     static deserialize(bytes: Uint8Array): TokenChallenge {
         let offset = 0;
@@ -53,9 +69,13 @@ export class TokenChallenge {
 
         len = input.getUint16(offset);
         offset += 2;
-        const allOriginInfoBytes = input.buffer.slice(offset, offset + len);
-        const allOriginInfo = td.decode(allOriginInfoBytes);
-        const originInfo = allOriginInfo.split(',');
+
+        let originInfo = undefined;
+        if (len > 0) {
+            const allOriginInfoBytes = input.buffer.slice(offset, offset + len);
+            const allOriginInfo = td.decode(allOriginInfoBytes);
+            originInfo = allOriginInfo.split(',');
+        }
 
         return new TokenChallenge(type, issuerName, redemptionContext, originInfo);
     }
@@ -84,10 +104,14 @@ export class TokenChallenge {
         b = this.redemptionContext.buffer;
         output.push(b);
 
-        const allOriginInfo = this.originInfo.join(',');
-        const allOriginInfoBytes = te.encode(allOriginInfo);
-
         b = new ArrayBuffer(2);
+
+        let allOriginInfoBytes = new Uint8Array(0);
+        if (this.originInfo) {
+            const allOriginInfo = this.originInfo.join(',');
+            allOriginInfoBytes = te.encode(allOriginInfo);
+        }
+
         new DataView(b).setUint16(0, allOriginInfoBytes.length);
         output.push(b);
 
@@ -103,6 +127,27 @@ export interface PrivateToken {
     challengeSerialized: Uint8Array; // contains a serialized version of the TokenChallenge value.
     tokenKey: Uint8Array; //  contains a base64url encoding of the public key for issuance.
     maxAge: number | undefined; // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
+}
+
+export async function createPrivateToken(
+    tokenType: number,
+    issuerName: string,
+    issuerPublicKey: CryptoKey,
+    redemptionContext?: Uint8Array,
+    originInfo?: string[],
+    maxAge?: number,
+): Promise<PrivateToken> {
+    if (!redemptionContext) {
+        redemptionContext = new Uint8Array(0);
+    }
+    const tokenChallenge = new TokenChallenge(tokenType, issuerName, redemptionContext, originInfo);
+    const spkiPublicKey = new Uint8Array(await crypto.subtle.exportKey('spki', issuerPublicKey));
+    return {
+        challenge: tokenChallenge,
+        challengeSerialized: tokenChallenge.serialize(),
+        tokenKey: spkiPublicKey,
+        maxAge,
+    };
 }
 
 export function parsePrivateToken(data: string): PrivateToken {

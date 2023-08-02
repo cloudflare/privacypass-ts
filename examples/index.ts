@@ -2,13 +2,14 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { webcrypto } from 'node:crypto';
+import { publicVerifiableTokens } from './pubVerifiable.example.js';
 
 if (typeof crypto === 'undefined') {
     global.crypto = webcrypto as unknown as Crypto;
 }
 
 async function examples() {
-    console.log('examples here');
+    publicVerifiableTokens();
 }
 
 examples().catch((e: Error) => {

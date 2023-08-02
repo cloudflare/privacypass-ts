@@ -92,9 +92,16 @@ export class TokenResponse implements TokenResponseProtocol {
 
 export class Issuer {
     static readonly TYPE = TokenType;
-    static async issue(privateKey: CryptoKey, tokReq: TokenRequest): Promise<TokenResponse> {
+
+    constructor(
+        public Name: string,
+        private privateKey: CryptoKey,
+        public publicKey: CryptoKey,
+    ) {}
+
+    async issue(tokReq: TokenRequest): Promise<TokenResponse> {
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
-        return new TokenResponse(await blindRSA.blindSign(privateKey, tokReq.blindedMsg));
+        return new TokenResponse(await blindRSA.blindSign(this.privateKey, tokReq.blindedMsg));
     }
 }
 

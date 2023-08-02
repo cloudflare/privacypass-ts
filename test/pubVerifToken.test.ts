@@ -82,7 +82,8 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const tokReqSer = tokReq.serialize();
     expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
 
-    const tokRes = await Issuer.issue(privateKey, tokReq);
+    const issuer = new Issuer('issuer.example.com', privateKey, publicKey);
+    const tokRes = await issuer.issue(tokReq);
     testSerialize(TokenResponse, tokRes);
 
     const tokResSer = tokRes.serialize();
