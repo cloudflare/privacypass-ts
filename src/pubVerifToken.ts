@@ -3,7 +3,13 @@
 
 import { SUITES } from '@cloudflare/blindrsa-ts';
 
-import { TokenTypeEntry, PrivateToken, TokenPayload, Token } from './httpAuthScheme.js';
+import {
+    TokenTypeEntry,
+    PrivateToken,
+    TokenPayload,
+    Token,
+    TokenChallenge,
+} from './httpAuthScheme.js';
 import { convertPSSToEnc, joinAll } from './util.js';
 import {
     sendTokenRequest,
@@ -160,6 +166,30 @@ export class Client {
 
         return token;
     }
+}
+
+export async function createPrivateToken(
+    issuer: {
+        name: string;
+        publicKey: CryptoKey;
+    },
+    redemptionContext?: Uint8Array,
+    originInfo?: string[],
+    maxAge?: number,
+): Promise<PrivateToken> {
+    if (!redemptionContext) {
+        redemptionContext = new Uint8Array(0);
+    }
+
+    const tokenChallenge = new TokenChallenge(
+        TokenType.value,
+        issuer.name,
+        redemptionContext,
+        originInfo,
+    );
+    const publicKeySpki = new Uint8Array(await crypto.subtle.exportKey('spki', issuer.publicKey));
+
+    return new PrivateToken(tokenChallenge, publicKeySpki, maxAge);
 }
 
 export function verifyToken(publicKey: CryptoKey, token: Token): Promise<boolean> {

@@ -38,7 +38,8 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
 type HeaderVectors = (typeof headerVectors)[number];
 
 test.each(headerVectors)('AuthScheme-HeaderVector-%#', async (v: HeaderVectors) => {
-    const tokens = PrivateToken.parseMultiple(v['WWW-Authenticate']);
+    const tokens = await PrivateToken.parseMultiple(v['WWW-Authenticate']);
+
     let i = 0;
     for (const t of tokens) {
         expect(uint8ToHex(t.challengeSerialized)).toBe(v[`token-challenge-${i}` as keyof typeof v]);

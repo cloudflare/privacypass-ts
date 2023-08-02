@@ -61,13 +61,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const blind = hexToUint8(v.blind);
     const challengeSerialized = hexToUint8(v.token_challenge);
     const challenge = TokenChallenge.deserialize(challengeSerialized);
-
-    const privToken: PrivateToken = {
-        challenge,
-        challengeSerialized,
-        tokenKey: publicKeyEnc,
-        maxAge: undefined,
-    };
+    const privToken = new PrivateToken(challenge, publicKeyEnc);
 
     // Mock for randomized operations.
     jest.spyOn(crypto, 'getRandomValues')

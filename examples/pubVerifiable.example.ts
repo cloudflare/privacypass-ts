@@ -1,17 +1,10 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { PrivateToken } from '../src/httpAuthScheme.js';
-import { Client, Issuer, TokenType, verifyToken } from '../src/pubVerifToken.js';
+import { createPrivateToken, Client, Issuer, verifyToken } from '../src/pubVerifToken.js';
 
-export async function publicVerifiableTokens(): Promise<void> {
-    // Protocol Setup
-    //
-    // [ Everybody ] decided to use Public Verifiable Tokens
-    const TYPE = TokenType;
-
-    // [ Issuer ] creates a key pair.
-    const keys = (await crypto.subtle.generateKey(
+function genRSAKeyPair(): Promise<CryptoKeyPair> {
+    return crypto.subtle.generateKey(
         {
             name: 'RSA-PSS',
             modulusLength: 2048,
@@ -20,7 +13,16 @@ export async function publicVerifiableTokens(): Promise<void> {
         } as RsaHashedKeyGenParams,
         true,
         ['sign', 'verify'],
-    )) as CryptoKeyPair;
+    );
+}
+
+export async function publicVerifiableTokens(): Promise<void> {
+    // Protocol Setup
+    //
+    // [ Everybody ] decided to use Public Verifiable Tokens.
+
+    // [ Issuer ] creates a key pair.
+    const keys = await genRSAKeyPair();
     const issuer = new Issuer('issuer.com', keys.privateKey, keys.publicKey);
 
     // [ Client ] creates a state.
@@ -35,7 +37,7 @@ export async function publicVerifiableTokens(): Promise<void> {
     //     |<----- Request ------+                   |           |
     const redemptionContext = crypto.getRandomValues(new Uint8Array(32));
     const originInfo = ['origin.example.com', 'origin2.example.com'];
-    const tokChl = await PrivateToken.create(TYPE.value, issuer, redemptionContext, originInfo);
+    const tokChl = await createPrivateToken(issuer, redemptionContext, originInfo);
     //     +-- TokenChallenge -->|                   |           |
     //     |                     |<== Attestation ==>|           |
     //     |                     |                   |           |
@@ -49,5 +51,5 @@ export async function publicVerifiableTokens(): Promise<void> {
     //     |<-- Request+Token ---+                   |           |
     //     |                     |                   |           |
     const isValid = await /*origin*/ verifyToken(issuer.publicKey, token);
-    console.log(`Valid token? ${isValid}`);
+    console.log(`Valid Public-Verifiable token? ${isValid}`);
 }
