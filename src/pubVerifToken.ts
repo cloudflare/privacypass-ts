@@ -94,7 +94,7 @@ export class Issuer {
     static readonly TYPE = TokenType;
 
     constructor(
-        public Name: string,
+        public name: string,
         private privateKey: CryptoKey,
         public publicKey: CryptoKey,
     ) {}

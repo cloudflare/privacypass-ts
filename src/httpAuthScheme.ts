@@ -122,92 +122,101 @@ export class TokenChallenge {
     }
 }
 
-export interface PrivateToken {
-    challenge: TokenChallenge; // contains a TokenChallenge.
+export class PrivateToken {
     challengeSerialized: Uint8Array; // contains a serialized version of the TokenChallenge value.
-    tokenKey: Uint8Array; //  contains a base64url encoding of the public key for issuance.
-    maxAge: number | undefined; // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
-}
-
-export async function createPrivateToken(
-    tokenType: number,
-    issuerName: string,
-    issuerPublicKey: CryptoKey,
-    redemptionContext?: Uint8Array,
-    originInfo?: string[],
-    maxAge?: number,
-): Promise<PrivateToken> {
-    if (!redemptionContext) {
-        redemptionContext = new Uint8Array(0);
-    }
-    const tokenChallenge = new TokenChallenge(tokenType, issuerName, redemptionContext, originInfo);
-    const spkiPublicKey = new Uint8Array(await crypto.subtle.exportKey('spki', issuerPublicKey));
-    return {
-        challenge: tokenChallenge,
-        challengeSerialized: tokenChallenge.serialize(),
-        tokenKey: spkiPublicKey,
-        maxAge,
-    };
-}
-
-export function parsePrivateToken(data: string): PrivateToken {
-    // Consumes data:
-    //   challenge="abc...", token-key="123..."
-
-    const attributes = data.split(',');
-    const pt: Partial<PrivateToken> = {};
-
-    for (const attr of attributes) {
-        const idx = attr.indexOf('=');
-        let attrKey = attr.substring(0, idx);
-        let attrValue = attr.substring(idx + 1);
-        attrValue = attrValue.replaceAll('"', '');
-        attrKey = attrKey.trim();
-        attrValue = attrValue.trim();
-
-        switch (attrKey) {
-            case 'challenge':
-                pt.challengeSerialized = base64url.parse(attrValue);
-                pt.challenge = TokenChallenge.deserialize(pt.challengeSerialized);
-                break;
-            case 'token-key':
-                pt.tokenKey = base64url.parse(attrValue);
-                break;
-            case 'max-age':
-                pt.maxAge = parseInt(attrValue);
-                break;
-        }
-    }
-
-    if (
-        pt.challengeSerialized === undefined ||
-        pt.challenge === undefined ||
-        pt.tokenKey === undefined
+    constructor(
+        public challenge: TokenChallenge, // contains a TokenChallenge.
+        public tokenKey: Uint8Array, //  contains a base64url encoding of the public key for issuance.
+        public maxAge: number | undefined, // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
     ) {
-        throw new Error('cannot parse PrivateToken');
+        this.challengeSerialized = challenge.serialize();
     }
 
-    return pt as PrivateToken;
-}
+    static async create(
+        tokenType: number,
+        issuer: {
+            name: string;
+            publicKey: CryptoKey;
+        },
+        redemptionContext?: Uint8Array,
+        originInfo?: string[],
+        maxAge?: number,
+    ): Promise<PrivateToken> {
+        if (!redemptionContext) {
+            redemptionContext = new Uint8Array(0);
+        }
+        const tokenChallenge = new TokenChallenge(
+            tokenType,
+            issuer.name,
+            redemptionContext,
+            originInfo,
+        );
+        const spkiPublicKey = new Uint8Array(
+            await crypto.subtle.exportKey('spki', issuer.publicKey),
+        );
+        return new PrivateToken(tokenChallenge, spkiPublicKey, maxAge);
+    }
 
-export function parsePrivateTokens(header: string): PrivateToken[] {
-    // Consumes data:
-    //   PrivateToken challenge="abc...", token-key="123...",
-    //   PrivateToken challenge="def...", token-key="234..."
+    static parse(data: string): PrivateToken {
+        // Consumes data:
+        //   challenge="abc...", token-key="123..."
 
-    const challenges = header.split('PrivateToken ');
-    const listTokens = new Array<PrivateToken>();
+        const attributes = data.split(',');
+        const pt: Partial<PrivateToken> = {};
 
-    for (const challenge of challenges) {
-        if (challenge.length === 0) {
-            continue;
+        for (const attr of attributes) {
+            const idx = attr.indexOf('=');
+            let attrKey = attr.substring(0, idx);
+            let attrValue = attr.substring(idx + 1);
+            attrValue = attrValue.replaceAll('"', '');
+            attrKey = attrKey.trim();
+            attrValue = attrValue.trim();
+
+            switch (attrKey) {
+                case 'challenge':
+                    pt.challengeSerialized = base64url.parse(attrValue);
+                    pt.challenge = TokenChallenge.deserialize(pt.challengeSerialized);
+                    break;
+                case 'token-key':
+                    pt.tokenKey = base64url.parse(attrValue);
+                    break;
+                case 'max-age':
+                    pt.maxAge = parseInt(attrValue);
+                    break;
+            }
         }
 
-        const privToken = parsePrivateToken(challenge);
-        listTokens.push(privToken);
+        // Check for mandotory fields.
+        if (
+            pt.challengeSerialized === undefined ||
+            pt.challenge === undefined ||
+            pt.tokenKey === undefined
+        ) {
+            throw new Error('cannot parse PrivateToken');
+        }
+
+        return pt as PrivateToken;
     }
 
-    return listTokens;
+    static parseMultiple(header: string): PrivateToken[] {
+        // Consumes data:
+        //   PrivateToken challenge="abc...", token-key="123...",
+        //   PrivateToken challenge="def...", token-key="234..."
+
+        const challenges = header.split('PrivateToken ');
+        const listTokens = new Array<PrivateToken>();
+
+        for (const challenge of challenges) {
+            if (challenge.length === 0) {
+                continue;
+            }
+
+            const privToken = PrivateToken.parse(challenge);
+            listTokens.push(privToken);
+        }
+
+        return listTokens;
+    }
 }
 
 export class TokenPayload {
