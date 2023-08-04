@@ -12,7 +12,7 @@ import {
     TokenType,
     verifyToken,
 } from '../src/pubVerifToken.js';
-import { convertPSSToEnc } from '../src/util.js';
+import { convertRSASSAPSSToEnc } from '../src/util.js';
 import { TokenChallenge, PrivateToken, Token } from '../src/httpAuthScheme.js';
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
@@ -38,7 +38,7 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
         ['sign'],
     );
 
-    const spkiEncoded = convertPSSToEnc(hexToUint8(v.pkS));
+    const spkiEncoded = convertRSASSAPSSToEnc(hexToUint8(v.pkS));
     const publicKey = await crypto.subtle.importKey(
         'spki',
         spkiEncoded,

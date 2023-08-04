@@ -5,6 +5,9 @@ import { TokenType as PubTokenType, fetchPublicVerifToken } from './pubVerifToke
 import { PrivateToken } from './httpAuthScheme.js';
 import { base64url } from 'rfc4648';
 
+import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
+export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
+
 export async function header_to_token(header: string): Promise<string | null> {
     const privateTokens = await PrivateToken.parseMultiple(header);
     if (privateTokens.length === 0) {

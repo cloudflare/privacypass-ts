@@ -10,7 +10,7 @@ import {
     Token,
     TokenChallenge,
 } from './httpAuthScheme.js';
-import { convertPSSToEnc, joinAll } from './util.js';
+import { convertRSASSAPSSToEnc, joinAll } from './util.js';
 import {
     sendTokenRequest,
     getIssuerUrl,
@@ -132,7 +132,7 @@ export class Client {
         const tokenInput = tokenPayload.serialize();
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
-        const spkiEncoded = convertPSSToEnc(privToken.tokenKey);
+        const spkiEncoded = convertRSASSAPSSToEnc(privToken.tokenKey);
         const publicKeyIssuer = await crypto.subtle.importKey(
             'spki',
             spkiEncoded,
