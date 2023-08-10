@@ -183,15 +183,14 @@ export class PrivateToken {
         // Consumes data:
         //   PrivateToken challenge="abc...", token-key="123...",
         //   PrivateToken challenge="def...", token-key="234..."
+        // Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
+        const rfc9110Exp = new RegExp(/PrivateToken\s+((?:[a-zA-Z_-]+="[^"]*"\s*,?\s*)+)/g);
+        const matches = [...header.matchAll(rfc9110Exp)];
+        const challenges = matches.map(match => match[1].trim().replace(/,$/, ''));
 
-        const challenges = header.split('PrivateToken ');
         const listTokens = new Array<PrivateToken>();
 
         for (const challenge of challenges) {
-            if (challenge.length === 0) {
-                continue;
-            }
-
             const privToken = await PrivateToken.parse(challenge);
             listTokens.push(privToken);
         }
