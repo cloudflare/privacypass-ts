@@ -186,7 +186,7 @@ export class PrivateToken {
         // Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
         const rfc9110Exp = new RegExp(/PrivateToken\s+((?:[a-zA-Z_-]+="[^"]*"\s*,?\s*)+)/g);
         const matches = [...header.matchAll(rfc9110Exp)];
-        const challenges = matches.map(match => match[1].trim().replace(/,$/, ''));
+        const challenges = matches.map((match) => match[1].trim().replace(/,$/, ''));
 
         const listTokens = new Array<PrivateToken>();
 
