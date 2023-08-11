@@ -4,7 +4,8 @@
     "description": "privacypass-ts: A TypeScript Library for the Privacy Pass Issuance Protocol",
     "author": "Armando Faz <armfazh@cloudflare.com>",
     "contributors": [
-        "Armando Faz <armfazh@cloudflare.com>"
+        "Armando Faz <armfazh@cloudflare.com>",
+        "Thibault Meunier <thibault@cloudflare.com>"
     ],
     "license": "Apache-2.0",
     "private": false,
