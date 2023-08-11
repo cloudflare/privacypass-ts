@@ -7,6 +7,9 @@ import { base64url } from 'rfc4648';
 
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
+export * as pubVerfiToken from './pubVerifToken.js';
+export * as httpAuthScheme from './httpAuthScheme.js';
+export * as issuance from './issuance.js';
 
 export async function header_to_token(header: string): Promise<string | null> {
     const privateTokens = await PrivateToken.parseMultiple(header);
