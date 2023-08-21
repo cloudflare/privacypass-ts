@@ -182,9 +182,10 @@ export class PrivateToken {
     static async parseMultiple(header: string): Promise<PrivateToken[]> {
         // Consumes data:
         //   PrivateToken challenge="abc...", token-key="123...",
-        //   PrivateToken challenge="def...", token-key="234..."
+        //   PrivateToken challenge="def...", token-key="234...",
+        //   PrivateToken challenge=ghi..., token-key=345...
         // Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
-        const rfc9110Exp = new RegExp(/PrivateToken\s+((?:[a-zA-Z_-]+="[^"]*"\s*,?\s*)+)/g);
+        const rfc9110Exp = new RegExp(/PrivateToken\s+((?:[a-zA-Z_-]+=.+"\s+,?\s+)+)/g);
         const matches = [...header.matchAll(rfc9110Exp)];
         const challenges = matches.map((match) => match[1].trim().replace(/,$/, ''));
 
@@ -198,11 +199,26 @@ export class PrivateToken {
         return listTokens;
     }
 
-    async toString(): Promise<string> {
+    async toString(quotedString = false): Promise<string> {
+        // WWW-Authenticate does not impose authentication parameters escape with a double quote
+        // For more details, refer to RFC9110 Section 11.2 https://www.rfc-editor.org/rfc/rfc9110#section-11.2
+        const quote = quotedString ? '"' : '';
+        // eslint-disable-next-line func-style
+        const authParamToString = (param: string, value: string | number): string =>
+            `${param}=${quote}${value}${quote}`;
         const chl = base64url.stringify(this.challenge.serialize());
         const key = base64url.stringify(this.tokenKey);
-        const max = this.maxAge ? `, max-age="${this.maxAge}"` : '';
-        return `PrivateToken challenge="${chl}", token-key="${key}"${max}`;
+        const authParams: Record<string, string | number> = {
+            challenge: chl,
+            'token-key': key,
+        };
+        if (this.maxAge) {
+            authParams['max-age'] = this.maxAge;
+        }
+        const params = Object.entries(authParams)
+            .map(([param, value]) => authParamToString(param, value))
+            .join(', ');
+        return `PrivateToken ${params}`;
     }
 }
 
