@@ -58,13 +58,14 @@ export async function sendTokenRequest<T extends TokenResponseProtocol>(
     issuerUrl: string,
     tokReq: TokenRequestProtocol,
     tokRes: { new (_: Uint8Array): T },
+    headers?: Headers,
 ): Promise<T> {
+    headers ??= new Headers();
+    headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
+    headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
     const issuerResponse = await fetch(issuerUrl, {
         method: 'POST',
-        headers: [
-            ['Content-Type', MediaType.PRIVATE_TOKEN_REQUEST],
-            ['Accept', MediaType.PRIVATE_TOKEN_RESPONSE],
-        ],
+        headers,
         body: tokReq.serialize().buffer,
     });
 
