@@ -3,6 +3,7 @@
 
 import { base64url } from 'rfc4648';
 import { joinAll } from './util.js';
+import { parseWWWAuthenticate } from './rfc9110.js';
 
 export interface TokenTypeEntry {
     name: string;
@@ -182,17 +183,17 @@ export class PrivateToken {
     static async parseMultiple(header: string): Promise<PrivateToken[]> {
         // Consumes data:
         //   PrivateToken challenge="abc...", token-key="123...",
-        //   PrivateToken challenge="def...", token-key="234...",
-        //   PrivateToken challenge=ghi..., token-key=345...
-        // Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
-        const rfc9110Exp = new RegExp(/PrivateToken\s+((?:[a-zA-Z_-]+=.+"\s+,?\s+)+)/g);
-        const matches = [...header.matchAll(rfc9110Exp)];
-        const challenges = matches.map((match) => match[1].trim().replace(/,$/, ''));
+        //   PrivateToken challenge="def...", token-key="234..."
+        const challenges = parseWWWAuthenticate(header);
 
         const listTokens = new Array<PrivateToken>();
 
         for (const challenge of challenges) {
-            const privToken = await PrivateToken.parse(challenge);
+            if (!challenge.startsWith('PrivateToken ')) {
+                continue;
+            }
+            const chl = challenge.slice('PrivateToken '.length);
+            const privToken = await PrivateToken.parse(chl);
             listTokens.push(privToken);
         }
 
