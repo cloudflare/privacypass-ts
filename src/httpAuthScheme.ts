@@ -4,6 +4,8 @@
 import { base64url } from 'rfc4648';
 import { joinAll } from './util.js';
 import { parseWWWAuthenticate } from './rfc9110.js';
+import { getIssuerUrl } from './issuance.js';
+import { Client, TokenResponse } from './pubVerifToken.js';
 
 export interface TokenTypeEntry {
     name: string;
@@ -200,6 +202,29 @@ export class PrivateToken {
         return listTokens;
     }
 
+    static async create(
+        tokenType: TokenTypeEntry,
+        issuer: {
+            name: string;
+            publicKey: CryptoKey;
+        },
+        redemptionContext = new Uint8Array(0),
+        originInfo?: string[],
+        maxAge?: number,
+    ): Promise<PrivateToken> {
+        const tokenChallenge = new TokenChallenge(
+            tokenType.value,
+            issuer.name,
+            redemptionContext,
+            originInfo,
+        );
+        const publicKeySpki = new Uint8Array(
+            await crypto.subtle.exportKey('spki', issuer.publicKey),
+        );
+
+        return new PrivateToken(tokenChallenge, publicKeySpki, maxAge);
+    }
+
     toString(quotedString = false): string {
         // WWW-Authenticate does not impose authentication parameters escape with a double quote
         // For more details, refer to RFC9110 Section 11.2 https://www.rfc-editor.org/rfc/rfc9110#section-11.2
@@ -336,9 +361,27 @@ export class Token {
         return new Token(tokenTypeEntry, payload, authenticator);
     }
 
+    static async fetch(pt: PrivateToken): Promise<Token> {
+        const issuerUrl = await getIssuerUrl(pt.challenge.issuerName);
+        const client = new Client();
+        const tokReq = await client.createTokenRequest(pt);
+        const tokRes = await tokReq.send(issuerUrl, TokenResponse);
+        const token = await client.finalize(tokRes);
+        return token;
+    }
+
     serialize(): Uint8Array {
         return new Uint8Array(
             joinAll([this.payload.serialize().buffer, this.authenticator.buffer]),
+        );
+    }
+
+    verify(publicKey: CryptoKey): Promise<boolean> {
+        return crypto.subtle.verify(
+            { name: 'RSA-PSS', saltLength: 48 },
+            publicKey,
+            this.authenticator,
+            this.payload.serialize(),
         );
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { TokenType as PubTokenType } from '../src/pubVerifToken.js';
+import { TOKEN_TYPES } from '../src/pubVerifToken.js';
 import { TokenChallenge, TokenPayload, PrivateToken } from '../src/httpAuthScheme.js';
 import { hexToString, hexToUint8, testSerialize, uint8ToHex } from './util.js';
 
@@ -17,7 +17,7 @@ type TokenVectors = (typeof tokenVectors)[number];
 
 test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => {
     const tokenType = parseInt(v.token_type);
-    if (tokenType !== PubTokenType.value) {
+    if (tokenType !== TOKEN_TYPES.BLIND_RSA.value) {
         return;
     }
 
@@ -32,7 +32,7 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
     testSerialize(TokenChallenge, challenge);
 
     const context = new Uint8Array(await crypto.subtle.digest('SHA-256', challengeSerialized));
-    const payload = new TokenPayload(PubTokenType, nonce, context, keyId);
+    const payload = new TokenPayload(TOKEN_TYPES.BLIND_RSA, nonce, context, keyId);
     const payloadEnc = payload.serialize();
 
     expect(uint8ToHex(payloadEnc)).toBe(v.token_authenticator_input);

@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { createPrivateToken, Client, Issuer, verifyToken } from '../src/pubVerifToken.js';
+import { Client, Issuer, PrivateToken, TOKEN_TYPES } from '../src/index.js';
 
 function genRSAKeyPair(): Promise<CryptoKeyPair> {
     return crypto.subtle.generateKey(
@@ -37,7 +37,12 @@ export async function publicVerifiableTokens(): Promise<void> {
     //     |<----- Request ------+                   |           |
     const redemptionContext = crypto.getRandomValues(new Uint8Array(32));
     const originInfo = ['origin.example.com', 'origin2.example.com'];
-    const tokChl = await createPrivateToken(issuer, redemptionContext, originInfo);
+    const tokChl = await PrivateToken.create(
+        TOKEN_TYPES.BLIND_RSA,
+        issuer,
+        redemptionContext,
+        originInfo,
+    );
     //     +-- TokenChallenge -->|                   |           |
     //     |                     |<== Attestation ==>|           |
     //     |                     |                   |           |
@@ -50,6 +55,6 @@ export async function publicVerifiableTokens(): Promise<void> {
     const token = await client.finalize(tokRes);
     //     |<-- Request+Token ---+                   |           |
     //     |                     |                   |           |
-    const isValid = await /*origin*/ verifyToken(issuer.publicKey, token);
+    const isValid = await /*origin*/ token.verify(issuer.publicKey);
     console.log(`Valid Public-Verifiable token? ${isValid}`);
 }
