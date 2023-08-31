@@ -3,8 +3,8 @@
 
 
 // Mocking crypto with NodeJS WebCrypto module only for tests.
-import { webcrypto } from 'node:crypto'
+import { webcrypto } from 'node:crypto';
 
 if (typeof crypto === 'undefined') {
-    global.crypto = webcrypto
+    Object.assign(global, { crypto: webcrypto });
 }
