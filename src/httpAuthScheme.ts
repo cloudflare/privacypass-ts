@@ -133,7 +133,7 @@ export class PrivateToken {
         this.challengeSerialized = challenge.serialize();
     }
 
-    static async parse(data: string): Promise<PrivateToken> {
+    static parse(data: string): PrivateToken {
         // Consumes data:
         //   challenge="abc...", token-key="123..."
 
@@ -180,7 +180,7 @@ export class PrivateToken {
         return pt;
     }
 
-    static async parseMultiple(header: string): Promise<PrivateToken[]> {
+    static parseMultiple(header: string): PrivateToken[] {
         // Consumes data:
         //   PrivateToken challenge="abc...", token-key="123...",
         //   PrivateToken challenge="def...", token-key="234..."
@@ -193,14 +193,14 @@ export class PrivateToken {
                 continue;
             }
             const chl = challenge.slice('PrivateToken '.length);
-            const privToken = await PrivateToken.parse(chl);
+            const privToken = PrivateToken.parse(chl);
             listTokens.push(privToken);
         }
 
         return listTokens;
     }
 
-    async toString(quotedString = false): Promise<string> {
+    toString(quotedString = false): string {
         // WWW-Authenticate does not impose authentication parameters escape with a double quote
         // For more details, refer to RFC9110 Section 11.2 https://www.rfc-editor.org/rfc/rfc9110#section-11.2
         const quote = quotedString ? '"' : '';
