@@ -52,35 +52,3 @@ export interface TokenRequestProtocol {
 }
 
 export interface TokenResponseProtocol {}
-
-// Send TokenRequest to Issuer (fetch w/POST).
-export async function sendTokenRequest<T extends TokenResponseProtocol>(
-    issuerUrl: string,
-    tokReq: TokenRequestProtocol,
-    tokRes: { new (_: Uint8Array): T },
-    headers?: Headers,
-): Promise<T> {
-    headers ??= new Headers();
-    headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
-    headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
-    const issuerResponse = await fetch(issuerUrl, {
-        method: 'POST',
-        headers,
-        body: tokReq.serialize().buffer,
-    });
-
-    if (issuerResponse.status !== 200) {
-        const body = await issuerResponse.text();
-        throw new Error(`tokenRequest failed with code:${issuerResponse.status} response:${body}`);
-    }
-
-    const contentType = issuerResponse.headers.get('Content-Type');
-
-    if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE) {
-        throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
-    }
-
-    //  Receive a TokenResponse,
-    const resp = new Uint8Array(await issuerResponse.arrayBuffer());
-    return new tokRes(resp);
-}
