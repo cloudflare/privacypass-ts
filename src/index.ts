@@ -12,7 +12,7 @@ export * as httpAuthScheme from './httpAuthScheme.js';
 export * as issuance from './issuance.js';
 
 export async function header_to_token(header: string): Promise<string | null> {
-    const privateTokens = await PrivateToken.parseMultiple(header);
+    const privateTokens = PrivateToken.parseMultiple(header);
     if (privateTokens.length === 0) {
         return null;
     }
