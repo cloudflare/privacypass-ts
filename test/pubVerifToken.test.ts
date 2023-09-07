@@ -4,9 +4,19 @@
 import { jest } from '@jest/globals';
 import { base64 } from 'rfc4648';
 
-import { Client, Issuer, TokenRequest, TokenResponse, TOKEN_TYPES } from '../src/pubVerifToken.js';
-import { convertRSASSAPSSToEnc } from '../src/util.js';
-import { TokenChallenge, PrivateToken, Token } from '../src/httpAuthScheme.js';
+import {
+    Client,
+    Issuer,
+    TokenRequest,
+    TokenResponse,
+    util,
+    TokenChallenge,
+    TOKEN_TYPES,
+    Token,
+    verifyToken,
+    AuthorizationHeader,
+} from '../src/index.js';
+
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-test-vectors
@@ -31,7 +41,7 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
         ['sign'],
     );
 
-    const spkiEncoded = convertRSASSAPSSToEnc(hexToUint8(v.pkS));
+    const spkiEncoded = util.convertRSASSAPSSToEnc(hexToUint8(v.pkS));
     const publicKey = await crypto.subtle.importKey(
         'spki',
         spkiEncoded,
@@ -53,8 +63,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const nonce = hexToUint8(v.nonce);
     const blind = hexToUint8(v.blind);
     const challengeSerialized = hexToUint8(v.token_challenge);
-    const challenge = TokenChallenge.deserialize(challengeSerialized);
-    const privToken = new PrivateToken(challenge, publicKeyEnc);
+    const tokChl = TokenChallenge.deserialize(challengeSerialized);
 
     // Mock for randomized operations.
     jest.spyOn(crypto, 'getRandomValues')
@@ -63,7 +72,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
         .mockReturnValueOnce(blind);
 
     const client = new Client();
-    const tokReq = await client.createTokenRequest(privToken);
+    const tokReq = await client.createTokenRequest(tokChl, publicKeyEnc);
     testSerialize(TokenRequest, tokReq);
 
     const tokReqSer = tokReq.serialize();
@@ -82,15 +91,17 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const tokenSer = token.serialize();
     expect(uint8ToHex(tokenSer)).toBe(v.token);
 
-    expect(await token.verify(publicKey)).toBe(true);
+    expect(await verifyToken(token, issuer.publicKey)).toBe(true);
 
-    const header = token.toString();
-    const parsedTokens = Token.parse(TOKEN_TYPES.BLIND_RSA, header);
+    const header = new AuthorizationHeader(token).toString();
+    const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
     const parsedToken = parsedTokens[0];
     expect(parsedTokens).toHaveLength(1);
-    expect(parsedToken.payload.challengeDigest).toEqual(token.payload.challengeDigest);
-    expect(parsedToken.payload.nonce).toEqual(token.payload.nonce);
-    expect(parsedToken.payload.tokenKeyId).toEqual(token.payload.tokenKeyId);
-    expect(parsedToken.payload.tokenType).toBe(token.payload.tokenType);
-    expect(parsedToken.authenticator).toEqual(token.authenticator);
+    expect(parsedToken.token.tokenPayload.challengeDigest).toEqual(
+        token.tokenPayload.challengeDigest,
+    );
+    expect(parsedToken.token.tokenPayload.nonce).toEqual(token.tokenPayload.nonce);
+    expect(parsedToken.token.tokenPayload.tokenKeyId).toEqual(token.tokenPayload.tokenKeyId);
+    expect(parsedToken.token.tokenPayload.tokenType).toBe(token.tokenPayload.tokenType);
+    expect(parsedToken.token.authenticator).toEqual(token.authenticator);
 });

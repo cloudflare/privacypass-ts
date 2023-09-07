@@ -1,6 +1,9 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
+import { AuthorizationHeader, WWWAuthenticateHeader } from './httpAuthScheme.js';
+import { Client, TokenRequest, TokenResponse } from './pubVerifToken.js';
+
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#section-8.3
@@ -47,8 +50,44 @@ export async function getIssuerUrl(issuerName: string): Promise<string> {
     }
 }
 
-export interface TokenRequestProtocol {
-    serialize(): Uint8Array;
+// Send TokenRequest to Issuer (fetch w/POST).
+export async function sendTokenRequest(
+    tokReq: TokenRequest,
+    issuerUrl: string,
+    headers?: Headers,
+): Promise<TokenResponse> {
+    headers ??= new Headers();
+    headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
+    headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
+    const issuerResponse = await fetch(issuerUrl, {
+        method: 'POST',
+        headers,
+        body: tokReq.serialize().buffer,
+    });
+
+    if (issuerResponse.status !== 200) {
+        const body = await issuerResponse.text();
+        throw new Error(`tokenRequest failed with code:${issuerResponse.status} response:${body}`);
+    }
+
+    const contentType = issuerResponse.headers.get('Content-Type');
+
+    if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE) {
+        throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
+    }
+
+    //  Receive a TokenResponse,
+    const resp = new Uint8Array(await issuerResponse.arrayBuffer());
+    return new TokenResponse(resp);
 }
 
-export interface TokenResponseProtocol {}
+export async function issuanceProtocol(
+    header: WWWAuthenticateHeader,
+): Promise<AuthorizationHeader> {
+    const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
+    const client = new Client();
+    const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
+    const tokRes = await sendTokenRequest(tokReq, issuerUrl);
+    const token = await client.finalize(tokRes);
+    return new AuthorizationHeader(token);
+}

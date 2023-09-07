@@ -3,11 +3,14 @@
 
 import { SUITES } from '@cloudflare/blindrsa-ts';
 
-import { TokenTypeEntry, PrivateToken, TokenPayload, Token } from './httpAuthScheme.js';
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
-import { TokenResponseProtocol, TokenRequestProtocol, MediaType } from './issuance.js';
+import { Token, TokenChallenge, TokenPayload, TokenTypeEntry } from './tokenBase.js';
 
-const BLIND_RSA: TokenTypeEntry = {
+// Token Type Entry Update:
+//  - Token Type Blind RSA (2048-bit)
+//
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
+export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     value: 0x0002,
     name: 'Blind RSA (2048)',
     Nk: 256,
@@ -17,11 +20,39 @@ const BLIND_RSA: TokenTypeEntry = {
     privateMetadata: false,
 } as const;
 
-export const TOKEN_TYPES = {
-    BLIND_RSA,
-} as const;
+export function keyGen(): Promise<CryptoKeyPair> {
+    return crypto.subtle.generateKey(
+        {
+            name: 'RSA-PSS',
+            modulusLength: 2048,
+            publicExponent: Uint8Array.from([1, 0, 1]),
+            hash: 'SHA-384',
+        } as RsaHashedKeyGenParams,
+        true,
+        ['sign', 'verify'],
+    );
+}
 
-export class TokenRequest implements TokenRequestProtocol {
+function getCryptoKey(publicKey: Uint8Array): Promise<CryptoKey> {
+    const spkiEncoded = convertRSASSAPSSToEnc(publicKey);
+    return crypto.subtle.importKey(
+        'spki',
+        spkiEncoded,
+        { name: 'RSA-PSS', hash: 'SHA-384' },
+        true,
+        ['verify'],
+    );
+}
+
+export async function getPublicKeyBytes(publicKey: CryptoKey): Promise<Uint8Array> {
+    return new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
+}
+
+async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
+    return new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey));
+}
+
+export class TokenRequest {
     tokenType: number;
     constructor(
         public tokenKeyId: number,
@@ -71,42 +102,9 @@ export class TokenRequest implements TokenRequestProtocol {
 
         return new Uint8Array(joinAll(output));
     }
-
-    // Send TokenRequest to Issuer (fetch w/POST).
-    async send<T extends TokenResponseProtocol>(
-        issuerUrl: string,
-        tokRes: { new (_: Uint8Array): T },
-        headers?: Headers,
-    ): Promise<T> {
-        headers ??= new Headers();
-        headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
-        headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
-        const issuerResponse = await fetch(issuerUrl, {
-            method: 'POST',
-            headers,
-            body: this.serialize().buffer,
-        });
-
-        if (issuerResponse.status !== 200) {
-            const body = await issuerResponse.text();
-            throw new Error(
-                `tokenRequest failed with code:${issuerResponse.status} response:${body}`,
-            );
-        }
-
-        const contentType = issuerResponse.headers.get('Content-Type');
-
-        if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE) {
-            throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
-        }
-
-        //  Receive a TokenResponse,
-        const resp = new Uint8Array(await issuerResponse.arrayBuffer());
-        return new tokRes(resp);
-    }
 }
 
-export class TokenResponse implements TokenResponseProtocol {
+export class TokenResponse {
     constructor(public blindSig: Uint8Array) {
         if (blindSig.length !== BLIND_RSA.Nk) {
             throw new Error('invalid blind signature size');
@@ -120,6 +118,15 @@ export class TokenResponse implements TokenResponseProtocol {
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
     }
+}
+
+export function verifyToken(token: Token, publicKeyIssuer: CryptoKey): Promise<boolean> {
+    return crypto.subtle.verify(
+        { name: 'RSA-PSS', saltLength: 48 },
+        publicKeyIssuer,
+        token.authenticator,
+        token.tokenPayload.serialize(),
+    );
 }
 
 export class Issuer {
@@ -139,55 +146,59 @@ export class Issuer {
 
 export class Client {
     static readonly TYPE = BLIND_RSA;
+
     private finData?: {
-        publicKeyIssuer: CryptoKey;
+        pkIssuer: CryptoKey;
         tokenInput: Uint8Array;
         tokenPayload: TokenPayload;
-        tokenRequest: TokenRequest;
         inv: Uint8Array;
     };
 
-    async createTokenRequest(privToken: PrivateToken): Promise<TokenRequest> {
+    async createTokenRequest(
+        tokChl: TokenChallenge,
+        issuerPublicKey: Uint8Array,
+    ): Promise<TokenRequest> {
         // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#section-6.1
         const nonce = crypto.getRandomValues(new Uint8Array(32));
-        const context = new Uint8Array(
-            await crypto.subtle.digest('SHA-256', privToken.challengeSerialized),
+        const context = new Uint8Array(await crypto.subtle.digest('SHA-256', tokChl.serialize()));
+
+        const tokenKeyId = await getTokenKeyID(issuerPublicKey);
+        const tokenPayload = new TokenPayload(
+            Client.TYPE,
+            Client.TYPE.value,
+            nonce,
+            context,
+            tokenKeyId,
         );
-        const keyId = new Uint8Array(await crypto.subtle.digest('SHA-256', privToken.tokenKey));
-        const tokenPayload = new TokenPayload(Client.TYPE, nonce, context, keyId);
         const tokenInput = tokenPayload.serialize();
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
-        const spkiEncoded = convertRSASSAPSSToEnc(privToken.tokenKey);
-        const publicKeyIssuer = await crypto.subtle.importKey(
-            'spki',
-            spkiEncoded,
-            { name: 'RSA-PSS', hash: 'SHA-384' },
-            true,
-            ['verify'],
-        );
+        const pkIssuer = await getCryptoKey(issuerPublicKey);
 
-        const { blindedMsg, inv } = await blindRSA.blind(publicKeyIssuer, tokenInput);
-        const tokenKeyId = keyId[keyId.length - 1];
-        const tokenRequest = new TokenRequest(tokenKeyId, blindedMsg);
-        this.finData = { tokenInput, tokenPayload, inv, tokenRequest, publicKeyIssuer };
+        const { blindedMsg, inv } = await blindRSA.blind(pkIssuer, tokenInput);
+        const trucatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
+        const tokenRequest = new TokenRequest(trucatedTokenKeyId, blindedMsg);
+
+        this.finData = { tokenInput, tokenPayload, inv, pkIssuer };
 
         return tokenRequest;
     }
 
-    async finalize(t: TokenResponse): Promise<Token> {
+    async finalize(tokRes: TokenResponse): Promise<Token> {
+        // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#section-6.3
         if (!this.finData) {
             throw new Error('no token request was created yet.');
         }
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
         const authenticator = await blindRSA.finalize(
-            this.finData.publicKeyIssuer,
+            this.finData.pkIssuer,
             this.finData.tokenInput,
-            t.blindSig,
+            tokRes.blindSig,
             this.finData.inv,
         );
         const token = new Token(Client.TYPE, this.finData.tokenPayload, authenticator);
+
         this.finData = undefined;
 
         return token;
