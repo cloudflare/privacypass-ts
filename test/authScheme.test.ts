@@ -41,7 +41,7 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
 type HeaderVectors = (typeof headerVectors)[number];
 
 test.each(headerVectors)('AuthScheme-HeaderVector-%#', (v: HeaderVectors) => {
-    const tokens = PrivateToken.parseMultiple(v['WWW-Authenticate']);
+    const tokens = PrivateToken.parse(v['WWW-Authenticate']);
 
     let i = 0;
     for (const t of tokens) {

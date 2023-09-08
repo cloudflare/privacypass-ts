@@ -85,7 +85,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     expect(await token.verify(publicKey)).toBe(true);
 
     const header = token.toString();
-    const parsedTokens = Token.parseMultiple(TOKEN_TYPES.BLIND_RSA, header);
+    const parsedTokens = Token.parse(TOKEN_TYPES.BLIND_RSA, header);
     const parsedToken = parsedTokens[0];
     expect(parsedTokens).toHaveLength(1);
     expect(parsedToken.payload.challengeDigest).toEqual(token.payload.challengeDigest);

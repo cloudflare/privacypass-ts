@@ -3,7 +3,11 @@
 
 import { base64url } from 'rfc4648';
 import { joinAll } from './util.js';
-import { parseWWWAuthenticate, toStringWWWAuthenticate } from './rfc9110.js';
+import {
+    parseWWWAuthenticate,
+    parseWWWAuthenticateWithNonCompliantTokens,
+    toStringWWWAuthenticate,
+} from './rfc9110.js';
 import { getIssuerUrl } from './issuance.js';
 import { Client, TokenResponse } from './pubVerifToken.js';
 
@@ -137,7 +141,7 @@ export class PrivateToken {
         this.challengeSerialized = challenge.serialize();
     }
 
-    static parse(data: string): PrivateToken {
+    private static parseSingle(data: string): PrivateToken {
         // Consumes data:
         //   challenge="abc...", token-key="123..."
 
@@ -184,7 +188,10 @@ export class PrivateToken {
         return pt;
     }
 
-    static parseMultiple(header: string): PrivateToken[] {
+    private static parseInternal(
+        header: string,
+        parseWWWAuthenticate: (header: string) => string[],
+    ): PrivateToken[] {
         // Consumes data:
         //   PrivateToken challenge="abc...", token-key="123...",
         //   PrivateToken challenge="def...", token-key="234..."
@@ -197,11 +204,21 @@ export class PrivateToken {
                 continue;
             }
             const chl = challenge.slice(`${AUTH_SCHEME} `.length);
-            const privToken = PrivateToken.parse(chl);
+            const privToken = PrivateToken.parseSingle(chl);
             listTokens.push(privToken);
         }
 
         return listTokens;
+    }
+
+    static parse(header: string): PrivateToken[] {
+        const tokens = this.parseInternal(header, parseWWWAuthenticate);
+        // if compliants tokens are found, return them
+        if (tokens.length !== 0) {
+            return tokens;
+        }
+        // otherwise, parse the challenge again including non compliant tokens
+        return this.parseInternal(header, parseWWWAuthenticateWithNonCompliantTokens);
     }
 
     static async create(
@@ -361,7 +378,7 @@ export class Token {
         return token;
     }
 
-    static parse(tokenTypeEntry: TokenTypeEntry, data: string): Token {
+    private static parseSingle(tokenTypeEntry: TokenTypeEntry, data: string): Token {
         // Consumes data:
         //   token="abc..."
 
@@ -390,7 +407,11 @@ export class Token {
         return ppToken;
     }
 
-    static parseMultiple(tokenTypeEntry: TokenTypeEntry, header: string): Token[] {
+    private static parseInternal(
+        tokenTypeEntry: TokenTypeEntry,
+        header: string,
+        parseWWWAuthenticate: (header: string) => string[],
+    ): Token[] {
         // Consumes data:
         //   PrivateToken token="abc...",
         //   PrivateToken token=def...
@@ -403,11 +424,25 @@ export class Token {
                 continue;
             }
             const chl = challenge.slice(`${AUTH_SCHEME} `.length);
-            const privToken = Token.parse(tokenTypeEntry, chl);
+            const privToken = Token.parseSingle(tokenTypeEntry, chl);
             listTokens.push(privToken);
         }
 
         return listTokens;
+    }
+
+    static parse(tokenTypeEntry: TokenTypeEntry, header: string): Token[] {
+        const tokens = this.parseInternal(tokenTypeEntry, header, parseWWWAuthenticate);
+        // if compliants tokens are found, return them
+        if (tokens.length !== 0) {
+            return tokens;
+        }
+        // otherwise, parse the challenge again including non compliant tokens
+        return this.parseInternal(
+            tokenTypeEntry,
+            header,
+            parseWWWAuthenticateWithNonCompliantTokens,
+        );
     }
 
     toString(quotedString = false): string {

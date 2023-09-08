@@ -3,10 +3,14 @@
 //   PrivateToken challenge="def...", token-key="234...",
 //   PrivateToken challenge=ghi..., token-key=345...
 // Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
-export function parseWWWAuthenticate(header: string): string[] {
+function parseWWWAuthenticateInternal(header: string, includeNonCompliantToken: boolean): string[] {
     const ALPHA = 'A-Za-z';
     const DIGIT = '0-9';
-    const tokenChar = `!#$%&'*+\\-\\.^_\`|~${DIGIT}${ALPHA}`;
+    let tokenChar = `!#$%&'*+\\-\\.^_\`|~${DIGIT}${ALPHA}`;
+    const nonRFCCompliantTokenCharFoundInTheWild = '=';
+    if (includeNonCompliantToken) {
+        tokenChar += nonRFCCompliantTokenCharFoundInTheWild;
+    }
     const tchar = `[${tokenChar}]`;
     const OWS = '[ \\t]*';
     const BWS = OWS;
@@ -22,6 +26,10 @@ export function parseWWWAuthenticate(header: string): string[] {
     const challenge = `${authScheme}(?: +(?:${authParam}(?:${OWS},${OWS}${authParam})*))?`;
     const challenges = `(?<skip>${OWS},${OWS})?(?<challenge>${challenge})`;
 
+    // The below eslint warning comes from the fact the function can or cannot include non compliant characters based on input parameters
+    // This means the regex is not built statically
+    // This is an ok behaviour in this case, given the dynamic component is scoped
+    // eslint-disable-next-line security/detect-non-literal-regexp
     const challengesRegex = new RegExp(`${challenges}`, 'y');
 
     let first = true;
@@ -45,6 +53,26 @@ export function parseWWWAuthenticate(header: string): string[] {
     }
 
     return matches;
+}
+
+// Consumes data:
+//   PrivateToken challenge="abc...", token-key="123...",
+//   PrivateToken challenge="def...==", token-key="234...",
+//   PrivateToken challenge=ghi..., token-key=345...
+// Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
+export function parseWWWAuthenticate(header: string): string[] {
+    return parseWWWAuthenticateInternal(header, false);
+}
+
+// This method devites from the RFC9110 specification, and allows for non compliant tokens to be parsed
+// These tokens have been observed in the wild, and are required for Privacy Pass to be backward compatible with these deviations
+// Consumes data:
+//   PrivateToken challenge="abc...", token-key="123...",
+//   PrivateToken challenge="def...==", token-key="234...",
+//   PrivateToken challenge=ghi...==, token-key=345...
+// Parse WWW-Authenticate according to RFC9110 Section 11.6.1 https://www.rfc-editor.org/rfc/rfc9110#section-11.6.1
+export function parseWWWAuthenticateWithNonCompliantTokens(header: string): string[] {
+    return parseWWWAuthenticateInternal(header, true);
 }
 
 function authParamToString(
