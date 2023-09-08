@@ -3,9 +3,11 @@
 
 import { base64url } from 'rfc4648';
 import { joinAll } from './util.js';
-import { parseWWWAuthenticate } from './rfc9110.js';
+import { parseWWWAuthenticate, toStringWWWAuthenticate } from './rfc9110.js';
 import { getIssuerUrl } from './issuance.js';
 import { Client, TokenResponse } from './pubVerifToken.js';
+
+export const AUTH_SCHEME = 'PrivateToken';
 
 export interface TokenTypeEntry {
     name: string;
@@ -191,10 +193,10 @@ export class PrivateToken {
         const listTokens = new Array<PrivateToken>();
 
         for (const challenge of challenges) {
-            if (!challenge.startsWith('PrivateToken ')) {
+            if (!challenge.startsWith(`${AUTH_SCHEME} `)) {
                 continue;
             }
-            const chl = challenge.slice('PrivateToken '.length);
+            const chl = challenge.slice(`${AUTH_SCHEME} `.length);
             const privToken = PrivateToken.parse(chl);
             listTokens.push(privToken);
         }
@@ -226,25 +228,14 @@ export class PrivateToken {
     }
 
     toString(quotedString = false): string {
-        // WWW-Authenticate does not impose authentication parameters escape with a double quote
-        // For more details, refer to RFC9110 Section 11.2 https://www.rfc-editor.org/rfc/rfc9110#section-11.2
-        const quote = quotedString ? '"' : '';
-        // eslint-disable-next-line func-style
-        const authParamToString = (param: string, value: string | number): string =>
-            `${param}=${quote}${value}${quote}`;
-        const chl = base64url.stringify(this.challenge.serialize());
-        const key = base64url.stringify(this.tokenKey);
         const authParams: Record<string, string | number> = {
-            challenge: chl,
-            'token-key': key,
+            challenge: base64url.stringify(this.challenge.serialize()),
+            'token-key': base64url.stringify(this.tokenKey),
         };
         if (this.maxAge) {
             authParams['max-age'] = this.maxAge;
         }
-        const params = Object.entries(authParams)
-            .map(([param, value]) => authParamToString(param, value))
-            .join(', ');
-        return `PrivateToken ${params}`;
+        return toStringWWWAuthenticate(AUTH_SCHEME, authParams, quotedString);
     }
 }
 
@@ -368,6 +359,60 @@ export class Token {
         const tokRes = await tokReq.send(issuerUrl, TokenResponse);
         const token = await client.finalize(tokRes);
         return token;
+    }
+
+    static parse(tokenTypeEntry: TokenTypeEntry, data: string): Token {
+        // Consumes data:
+        //   token="abc..."
+
+        const attributes = data.split(',');
+        let ppToken = undefined;
+
+        for (const attr of attributes) {
+            const idx = attr.indexOf('=');
+            let attrKey = attr.substring(0, idx);
+            let attrValue = attr.substring(idx + 1);
+            attrValue = attrValue.replaceAll('"', '');
+            attrKey = attrKey.trim();
+            attrValue = attrValue.trim();
+
+            if (attrKey === 'token') {
+                const tokenEnc = base64url.parse(attrValue);
+                ppToken = Token.deserialize(tokenTypeEntry, tokenEnc);
+            }
+        }
+
+        // Check for mandotory fields.
+        if (ppToken === undefined) {
+            throw new Error('cannot parse token');
+        }
+
+        return ppToken;
+    }
+
+    static parseMultiple(tokenTypeEntry: TokenTypeEntry, header: string): Token[] {
+        // Consumes data:
+        //   PrivateToken token="abc...",
+        //   PrivateToken token=def...
+        const challenges = parseWWWAuthenticate(header);
+
+        const listTokens = new Array<Token>();
+
+        for (const challenge of challenges) {
+            if (!challenge.startsWith(`${AUTH_SCHEME} `)) {
+                continue;
+            }
+            const chl = challenge.slice(`${AUTH_SCHEME} `.length);
+            const privToken = Token.parse(tokenTypeEntry, chl);
+            listTokens.push(privToken);
+        }
+
+        return listTokens;
+    }
+
+    toString(quotedString = false): string {
+        const token = base64url.stringify(this.serialize());
+        return toStringWWWAuthenticate(AUTH_SCHEME, { token }, quotedString);
     }
 
     serialize(): Uint8Array {

@@ -46,3 +46,31 @@ export function parseWWWAuthenticate(header: string): string[] {
 
     return matches;
 }
+
+function authParamToString(
+    param: string,
+    value: string | number | null,
+    quotedString: boolean,
+): string {
+    // WWW-Authenticate does not impose authentication parameters escape with a double quote
+    // For more details, refer to RFC9110 Section 11.2 https://www.rfc-editor.org/rfc/rfc9110#section-11.2
+    const quote = quotedString ? '"' : '';
+    if (value === null) {
+        return param;
+    }
+    return `${param}=${quote}${value}${quote}`;
+}
+
+export function toStringWWWAuthenticate(
+    authScheme: string,
+    authParams?: Record<string, string | number | null>,
+    quotedString = false,
+): string {
+    if (authParams === undefined) {
+        return authScheme;
+    }
+    const params = Object.entries(authParams)
+        .map(([param, value]) => authParamToString(param, value, quotedString))
+        .join(',');
+    return `${authScheme} ${params}`;
+}
