@@ -38,6 +38,7 @@
     },
     "dependencies": {
         "@cloudflare/blindrsa-ts": "0.1.0",
+        "@cloudflare/voprf-ts": "0.21.2",
         "asn1-parser": "1.1.8",
         "asn1js": "3.0.5",
         "rfc4648": "1.5.2"

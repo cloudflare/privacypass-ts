@@ -5,6 +5,7 @@ import { SUITES } from '@cloudflare/blindrsa-ts';
 
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
 import {
+    AuthenticatorInput,
     Token,
     TokenChallenge,
     AuthenticatorInput,
@@ -14,7 +15,7 @@ import {
 // Token Type Entry Update:
 //  - Token Type Blind RSA (2048-bit)
 //
-// https://ietf-wg-privacypass.github.io/base-drafts/draft-ietf-privacypass-protocol.html#name-token-type-blind-rsa-2048-b
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
 export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     value: 0x0002,
     name: 'Blind RSA (2048)',
@@ -23,6 +24,11 @@ export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     publicVerifiable: true,
     publicMetadata: false,
     privateMetadata: false,
+    reference:
+        'https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-blind-rsa-2048-b',
+    // TODO: Add support for both modes:
+    // notes: "The RSABSSA-SHA384-PSS-Deterministic and RSABSSA-SHA384-PSSZERO-Deterministic variants are supported"
+    notes: 'Only the RSABSSA-SHA384-PSS-Deterministic is supported',
 } as const;
 
 export function keyGen(): Promise<CryptoKeyPair> {
@@ -62,6 +68,12 @@ async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
 }
 
 export class TokenRequest {
+    // struct {
+    //     uint16_t token_type = 0x0002; /* Type Blind RSA (2048-bit) */
+    //     uint8_t truncated_token_key_id;
+    //     uint8_t blinded_msg[Nk];
+    // } TokenRequest;
+
     tokenType: number;
     constructor(
         public tokenKeyId: number,
@@ -116,7 +128,7 @@ export class TokenRequest {
 export class TokenResponse {
     constructor(public blindSig: Uint8Array) {
         if (blindSig.length !== BLIND_RSA.Nk) {
-            throw new Error('invalid blind signature size');
+            throw new Error('blind signature has invalid size');
         }
     }
 
@@ -141,15 +153,19 @@ export function verifyToken(token: Token, publicKeyIssuer: CryptoKey): Promise<b
 export class Issuer {
     static readonly TYPE = BLIND_RSA;
 
+    private blindRSAIssuer: BlindRSA;
+
     constructor(
         public name: string,
         private privateKey: CryptoKey,
         public publicKey: CryptoKey,
-    ) { }
+    ) {
+        this.blindRSAIssuer = SUITES.SHA384.PSS.Deterministic();
+    }
 
     async issue(tokReq: TokenRequest): Promise<TokenResponse> {
-        const blindRSA = SUITES.SHA384.PSS.Deterministic();
-        return new TokenResponse(await blindRSA.blindSign(this.privateKey, tokReq.blindedMsg));
+        const blindSig = await this.blindRSAIssuer.blindSign(this.privateKey, tokReq.blindedMsg);
+        return new TokenResponse(blindSig);
     }
 }
 
@@ -198,7 +214,7 @@ export class Client {
     async finalize(tokRes: TokenResponse): Promise<Token> {
         // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#section-6.3
         if (!this.finData) {
-            throw new Error('no token request was created yet.');
+            throw new Error('no token request was created yet');
         }
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
