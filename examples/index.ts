@@ -3,12 +3,14 @@
 
 import { webcrypto } from 'node:crypto';
 import { publicVerifiableTokens } from './pubVerifiable.example.js';
+import { privateVerifiableTokens } from './privVerifiable.example.js';
 
 if (typeof crypto === 'undefined') {
     global.crypto = webcrypto as unknown as Crypto;
 }
 
 async function examples() {
+    privateVerifiableTokens();
     publicVerifiableTokens();
 }
 

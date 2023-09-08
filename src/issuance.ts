@@ -1,8 +1,10 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
+import { Evaluation, Oprf } from '@cloudflare/voprf-ts';
 import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
-import { Client, TokenRequest, TokenResponse } from './pub_verif_token.js';
+import { Client2, TokenResponse2 } from './priv_verif_token.js';
+import { Client, TokenResponse } from './pub_verif_token.js';
 
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
 
@@ -52,17 +54,17 @@ export async function getIssuerUrl(issuerName: string): Promise<string> {
 
 // Send TokenRequest to Issuer (fetch w/POST).
 export async function sendTokenRequest(
-    tokReq: TokenRequest,
+    tokReqBytes: Uint8Array,
     issuerUrl: string,
     headers?: Headers,
-): Promise<TokenResponse> {
+): Promise<{ tokResBytes: Uint8Array }> {
     headers ??= new Headers();
     headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
     headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
     const issuerResponse = await fetch(issuerUrl, {
         method: 'POST',
         headers,
-        body: tokReq.serialize().buffer,
+        body: tokReqBytes,
     });
 
     if (issuerResponse.status !== 200) {
@@ -76,18 +78,33 @@ export async function sendTokenRequest(
         throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
     }
 
-    //  Receive a TokenResponse,
-    const resp = new Uint8Array(await issuerResponse.arrayBuffer());
-    return new TokenResponse(resp);
+    //  Receive a bytes corresponding to a TokenResponse,
+    const tokResBytes = new Uint8Array(await issuerResponse.arrayBuffer());
+    return { tokResBytes };
 }
 
-export async function issuanceProtocol(
+export async function issuanceProtocolPub(
     header: WWWAuthenticateHeader,
 ): Promise<AuthorizationHeader> {
     const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
     const client = new Client();
     const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
-    const tokRes = await sendTokenRequest(tokReq, issuerUrl);
+    const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
+    const tokRes = TokenResponse.deserialize(tokResBytes);
+    tokRes.blindSig = new Uint8Array();
+    const token = await client.finalize(tokRes);
+    return new AuthorizationHeader(token);
+}
+
+export async function issuanceProtocolPriv(
+    header: WWWAuthenticateHeader,
+): Promise<AuthorizationHeader> {
+    const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
+    const client = new Client2();
+    const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
+    const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
+    const tokRes = TokenResponse2.deserialize(tokResBytes);
+    tokRes.evaluation = new Evaluation(Oprf.Mode.VOPRF, [], undefined);
     const token = await client.finalize(tokRes);
     return new AuthorizationHeader(token);
 }

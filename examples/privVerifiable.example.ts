@@ -1,29 +1,21 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import {
-    verifyToken,
-    Client,
-    Issuer,
-    keyGen,
-    TOKEN_TYPES,
-    TokenChallenge,
-    getPublicKeyBytes,
-} from '../src/index.js';
+import { Client2, Issuer2, TOKEN_TYPES, TokenChallenge, keyGen2 } from '../src/index.js';
 
-export async function publicVerifiableTokens(): Promise<void> {
+export async function privateVerifiableTokens(): Promise<void> {
     // Protocol Setup
     //
-    // [ Everybody ] agree to use Public Verifiable Tokens.
-    const tokenType = TOKEN_TYPES.BLIND_RSA.value;
+    // [ Everybody ] agree to use Private-Verifiable Tokens.
+    const tokenType = TOKEN_TYPES.VOPRF.value;
 
     // [ Issuer ] creates a key pair.
-    const keys = await keyGen();
-    const issuer = new Issuer('issuer.com', keys.privateKey, keys.publicKey);
-    const pkIssuer = await getPublicKeyBytes(issuer.publicKey);
+    const keys = await keyGen2();
+    const issuer = new Issuer2('issuer.com', keys.privateKey, keys.publicKey);
+    const pkIssuer = issuer.publicKey;
 
     // [ Client ] creates a state.
-    const client = new Client();
+    const client = new Client2();
 
     // Online Protocol
     //
@@ -47,6 +39,6 @@ export async function publicVerifiableTokens(): Promise<void> {
     const token = await client.finalize(tokRes);
     //     |<-- Request+Token ---+                   |           |
     //     |                     |                   |           |
-    const isValid = await /*Origin*/ verifyToken(token, issuer.publicKey);
-    console.log(`Public-Verifiable token is valid: ${isValid}`);
+    const isValid = await issuer.verify(token);
+    console.log(`Private-Verifiable token is valid: ${isValid}`);
 }
