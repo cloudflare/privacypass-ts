@@ -1,8 +1,8 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { AuthorizationHeader, WWWAuthenticateHeader } from './httpAuthScheme.js';
-import { Client, TokenRequest, TokenResponse } from './pubVerifToken.js';
+import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { Client, TokenRequest, TokenResponse } from './pub_verif_token.js';
 
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
 

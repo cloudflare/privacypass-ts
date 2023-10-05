@@ -3,16 +3,14 @@
 
 import { base64url } from 'rfc4648';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
-import { BLIND_RSA } from './pubVerifToken.js';
-import { TokenTypeEntry } from './tokenBase.js';
-import { WWWAuthenticateHeader } from './httpAuthScheme.js';
+import { BLIND_RSA } from './pub_verif_token.js';
+import { type TokenTypeEntry, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import { issuanceProtocol } from './issuance.js';
 
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
-export * from './pubVerifToken.js';
-export * from './httpAuthScheme.js';
+export * from './auth_scheme/private_token.js';
+export * from './pub_verif_token.js';
 export * from './issuance.js';
-export * from './tokenBase.js';
 
 // Privacy Pass Token Type Registry
 // Updates:

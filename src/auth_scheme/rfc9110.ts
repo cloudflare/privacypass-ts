@@ -1,3 +1,6 @@
+// Copyright (c) 2023 Cloudflare, Inc.
+// Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
+
 // Consumes data:
 //   PrivateToken challenge="abc...", token-key="123...",
 //   PrivateToken challenge="def...", token-key="234...",

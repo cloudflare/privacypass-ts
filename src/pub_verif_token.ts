@@ -4,7 +4,12 @@
 import { SUITES } from '@cloudflare/blindrsa-ts';
 
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
-import { Token, TokenChallenge, TokenPayload, TokenTypeEntry } from './tokenBase.js';
+import {
+    Token,
+    TokenChallenge,
+    AuthenticatorInput,
+    type TokenTypeEntry,
+} from './auth_scheme/private_token.js';
 
 // Token Type Entry Update:
 //  - Token Type Blind RSA (2048-bit)
@@ -18,6 +23,8 @@ export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     publicVerifiable: true,
     publicMetadata: false,
     privateMetadata: false,
+    reference:
+        'https://ietf-wg-privacypass.github.io/base-drafts/draft-ietf-privacypass-protocol.html#name-token-type-blind-rsa-2048-b',
 } as const;
 
 export function keyGen(): Promise<CryptoKeyPair> {
@@ -125,7 +132,7 @@ export function verifyToken(token: Token, publicKeyIssuer: CryptoKey): Promise<b
         { name: 'RSA-PSS', saltLength: 48 },
         publicKeyIssuer,
         token.authenticator,
-        token.tokenPayload.serialize(),
+        token.authInput.serialize(),
     );
 }
 
@@ -150,7 +157,7 @@ export class Client {
     private finData?: {
         pkIssuer: CryptoKey;
         tokenInput: Uint8Array;
-        tokenPayload: TokenPayload;
+        authInput: AuthenticatorInput;
         inv: Uint8Array;
     };
 
@@ -163,14 +170,14 @@ export class Client {
         const context = new Uint8Array(await crypto.subtle.digest('SHA-256', tokChl.serialize()));
 
         const tokenKeyId = await getTokenKeyID(issuerPublicKey);
-        const tokenPayload = new TokenPayload(
+        const authInput = new AuthenticatorInput(
             Client.TYPE,
             Client.TYPE.value,
             nonce,
             context,
             tokenKeyId,
         );
-        const tokenInput = tokenPayload.serialize();
+        const tokenInput = authInput.serialize();
 
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
         const pkIssuer = await getCryptoKey(issuerPublicKey);
@@ -179,7 +186,7 @@ export class Client {
         const trucatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
         const tokenRequest = new TokenRequest(trucatedTokenKeyId, blindedMsg);
 
-        this.finData = { tokenInput, tokenPayload, inv, pkIssuer };
+        this.finData = { tokenInput, authInput, inv, pkIssuer };
 
         return tokenRequest;
     }
@@ -197,7 +204,7 @@ export class Client {
             tokRes.blindSig,
             this.finData.inv,
         );
-        const token = new Token(Client.TYPE, this.finData.tokenPayload, authenticator);
+        const token = new Token(Client.TYPE, this.finData.authInput, authenticator);
 
         this.finData = undefined;
 

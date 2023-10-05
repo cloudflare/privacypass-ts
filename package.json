@@ -31,7 +31,7 @@
         "build": "tsc -b",
         "test": "tsc -b test && node --experimental-vm-modules node_modules/jest/bin/jest.js --ci",
         "lint": "eslint .",
-        "format": "prettier './(src|test|bench|examples)/*.ts' --write",
+        "format": "prettier './(src|test|bench|examples)/**/*.ts' --write",
         "bench": "tsc -b bench && node ./lib/bench/index.js",
         "examples": "tsc -b examples && node ./lib/examples/index.js",
         "clean": "rimraf lib coverage dist"
