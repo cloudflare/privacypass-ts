@@ -97,11 +97,9 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
     const parsedToken = parsedTokens[0];
     expect(parsedTokens).toHaveLength(1);
-    expect(parsedToken.token.tokenPayload.challengeDigest).toEqual(
-        token.tokenPayload.challengeDigest,
-    );
-    expect(parsedToken.token.tokenPayload.nonce).toEqual(token.tokenPayload.nonce);
-    expect(parsedToken.token.tokenPayload.tokenKeyId).toEqual(token.tokenPayload.tokenKeyId);
-    expect(parsedToken.token.tokenPayload.tokenType).toBe(token.tokenPayload.tokenType);
+    expect(parsedToken.token.authInput.challengeDigest).toEqual(token.authInput.challengeDigest);
+    expect(parsedToken.token.authInput.nonce).toEqual(token.authInput.nonce);
+    expect(parsedToken.token.authInput.tokenKeyId).toEqual(token.authInput.tokenKeyId);
+    expect(parsedToken.token.authInput.tokenType).toBe(token.authInput.tokenType);
     expect(parsedToken.token.authenticator).toEqual(token.authenticator);
 });

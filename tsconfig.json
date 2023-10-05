@@ -23,6 +23,7 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "allowSyntheticDefaultImports": true,
+        "verbatimModuleSyntax": true,
         "rootDir": ".",
         "outDir": "lib"
     },
