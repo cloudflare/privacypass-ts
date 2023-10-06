@@ -5,7 +5,7 @@ import { base64url } from 'rfc4648';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
 import { BLIND_RSA } from './pub_verif_token.js';
 import { VOPRF } from './priv_verif_token.js';
-import { WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import { issuanceProtocolPriv, issuanceProtocolPub } from './issuance.js';
 
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
@@ -15,10 +15,11 @@ export * from './priv_verif_token.js';
 export * from './issuance.js';
 
 // Privacy Pass Token Type Registry
-// Updates:
+// Supported:
+//  - Token Type VOPRF (P-384, SHA-384)
 //  - Token Type Blind RSA (2048-bit)
 //
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-registry-updates
 export const TOKEN_TYPES = {
     // Token Type Blind RSA (2048-bit)
     BLIND_RSA,
@@ -26,31 +27,49 @@ export const TOKEN_TYPES = {
     VOPRF,
 } as const;
 
+// The Privacy Pass HTTP Authentication Scheme
+//
+// Ref. https://datatracker.ietf.org/doc/draft-ietf-privacypass-auth-scheme/
+//
+// +--------+                               +--------+
+// | Origin |                               | Client |
+// +---+----+                               +---+----+
+//     |                                        |
+//     |      | WWW-Authenticate:         |     |
+//     +----- |    PrivateToken challenge | --->|
+//     |                                        |
+//     |                            (Run issuance protocol)
+//     |                                        |
+//     |      | Authorization:            |     |
+//     |<---- |    PrivateToken token     | ----+
+//     |                                        |
+//
+
+// header_to_token parses a WWAuthenticate header received from
+// the Origin, and runs the issuance protocol, which returns an
+// Authorization header ready to be redeemed by the Origin.
 export async function header_to_token(header: string): Promise<string | null> {
     const privateTokens = WWWAuthenticateHeader.parse(header);
     if (privateTokens.length === 0) {
         return null;
     }
 
-    // Takes the first one.
+    // On the presence of multiple challenges, it takes the first one.
     const pt = privateTokens[0];
-    const tokenType = pt.challenge.tokenType;
-    const te = new TextEncoder();
-    switch (tokenType) {
-        case TOKEN_TYPES.VOPRF.value: {
-            const token = await issuanceProtocolPriv(pt);
-            const encodedToken = base64url.stringify(te.encode(token.toString()));
-            return encodedToken;
-        }
-
-        case TOKEN_TYPES.BLIND_RSA.value: {
-            const token = await issuanceProtocolPub(pt);
-            const encodedToken = base64url.stringify(te.encode(token.toString()));
-            return encodedToken;
-        }
-
+    let authHeader: AuthorizationHeader;
+    switch (pt.challenge.tokenType) {
+        case TOKEN_TYPES.VOPRF.value:
+            authHeader = await issuanceProtocolPriv(pt);
+            break;
+        case TOKEN_TYPES.BLIND_RSA.value:
+            authHeader = await issuanceProtocolPub(pt);
+            break;
         default:
-            console.log(`unrecognized or non-supported type of challenge: ${tokenType}`);
+            console.log(`unrecognized or non-supported token type in the challenge: ${pt.challenge.tokenType}`);
+            return null;
     }
-    return null;
+
+    const te = new TextEncoder();
+    const encodedToken = base64url.stringify(te.encode(authHeader.toString()));
+    return encodedToken;
 }
