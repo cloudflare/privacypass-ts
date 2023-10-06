@@ -8,7 +8,7 @@
 
 **Support:**
  - ✅ Public-Verifiable tokens (Blind-RSA)
- - 🚧 Private-Verifiable tokens (VOPRF)
+ - ✅ Private-Verifiable tokens (VOPRF)
 
 
 ### Development

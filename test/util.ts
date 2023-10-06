@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import type { TokenTypeEntry } from '../src';
+import type { TokenTypeEntry } from '../src/index.js';
 
 export function hexToString(x: string): string {
     return Buffer.from(x, 'hex').toString();

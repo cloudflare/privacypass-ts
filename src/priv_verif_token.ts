@@ -10,36 +10,64 @@ import {
     VOPRFServer,
     generateKeyPair,
     type DLEQParams,
+    type Group,
+    type SuiteID,
     type HashID,
+    DLEQProof,
 } from '@cloudflare/voprf-ts';
 
 import { joinAll } from './util.js';
-import { AuthenticatorInput, Token, TokenChallenge } from './auth_scheme/private_token.js';
+import {
+    AuthenticatorInput,
+    Token,
+    TokenChallenge,
+    type TokenTypeEntry,
+} from './auth_scheme/private_token.js';
+
+export interface VOPRFExtraParams {
+    suite: SuiteID;
+    group: Group;
+    Ne: number;
+    Ns: number;
+    Nk: number;
+    hash: HashID;
+    dleqParams: DLEQParams;
+}
 
 const VOPRF_SUITE = Oprf.Suite.P384_SHA384;
 const VOPRF_GROUP = Oprf.getGroup(VOPRF_SUITE);
-const Ne = VOPRF_GROUP.eltSize();
-const Ns = VOPRF_GROUP.scalarSize();
-const Nk = Oprf.getOprfSize(VOPRF_SUITE);
+const VOPRF_HASH = Oprf.getHash(VOPRF_SUITE) as HashID;
+const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
+    suite: VOPRF_SUITE,
+    group: VOPRF_GROUP,
+    Ne: VOPRF_GROUP.eltSize(),
+    Ns: VOPRF_GROUP.scalarSize(),
+    Nk: Oprf.getOprfSize(VOPRF_SUITE),
+    hash: VOPRF_HASH,
+    dleqParams: {
+        gg: VOPRF_GROUP,
+        hashID: VOPRF_HASH,
+        hash: Oprf.Crypto.hash,
+        dst: '',
+    },
+} as const;
 
 // Token Type Entry Update:
 //  - Token Type VOPRF (P-384, SHA-384)
 //
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
-export const VOPRF /*: Readonly<TokenTypeEntry> */ = {
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-voprf-p-384-sha-
+export const VOPRF: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
     value: 0x0001,
     name: 'VOPRF (P-384, SHA-384)',
-    Nk: Nk,
     Nid: 32,
     publicVerifiable: false,
     publicMetadata: false,
     privateMetadata: false,
-    reference:
-        'https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-voprf-p-384-sha-',
+    ...VOPRF_EXTRA_PARAMS,
 } as const;
 
 export function keyGen2(): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> {
-    return generateKeyPair(VOPRF_SUITE);
+    return generateKeyPair(VOPRF.suite);
 }
 
 async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
@@ -55,10 +83,10 @@ export class TokenRequest2 {
 
     tokenType: number;
     constructor(
-        public tokenKeyId: number,
+        public truncatedTokenKeyId: number,
         public blindedMsg: Uint8Array,
     ) {
-        if (blindedMsg.length !== Ne) {
+        if (blindedMsg.length !== VOPRF.Ne) {
             throw new Error('invalid blinded message size');
         }
 
@@ -76,14 +104,14 @@ export class TokenRequest2 {
             throw new Error('mismatch of token type');
         }
 
-        const tokenKeyId = input.getUint8(offset);
+        const truncatedTokenKeyId = input.getUint8(offset);
         offset += 1;
 
-        const len = Ne;
+        const len = VOPRF.Ne;
         const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
         offset += len;
 
-        return new TokenRequest2(tokenKeyId, blindedMsg);
+        return new TokenRequest2(truncatedTokenKeyId, blindedMsg);
     }
 
     serialize(): Uint8Array {
@@ -94,7 +122,7 @@ export class TokenRequest2 {
         output.push(b);
 
         b = new ArrayBuffer(1);
-        new DataView(b).setUint8(0, this.tokenKeyId);
+        new DataView(b).setUint8(0, this.truncatedTokenKeyId);
         output.push(b);
 
         b = this.blindedMsg.buffer;
@@ -110,44 +138,38 @@ export class TokenResponse2 {
     //     uint8_t evaluate_proof[Ns+Ns];
     //  } TokenResponse;
 
-    constructor(public evaluation: Evaluation) {
-        if (evaluation.evaluated.length !== 1) {
-            throw new Error('evaluation is of a non-single element');
-        }
-        const evaluate_msg = evaluation.evaluated[0].serialize();
-        if (evaluate_msg.length !== Ne) {
+    constructor(
+        public evaluateMsg: Uint8Array,
+        public evaluateProof: Uint8Array,
+    ) {
+        if (evaluateMsg.length !== VOPRF.Ne) {
             throw new Error('evaluate_msg has invalid size');
         }
-
-        if (typeof evaluation.proof === 'undefined') {
-            throw new Error('evaluation has no DLEQ proof');
-        }
-        const evaluate_proof = evaluation.proof.serialize();
-        if (evaluate_proof.length !== 2 * Ns) {
+        if (evaluateProof.length !== 2 * VOPRF.Ns) {
             throw new Error('evaluate_proof has invalid size');
         }
     }
 
     static deserialize(bytes: Uint8Array): TokenResponse2 {
-        const params: DLEQParams = {
-            gg: VOPRF_GROUP,
-            hashID: Oprf.getHash(VOPRF_SUITE) as HashID,
-            hash: Oprf.Crypto.hash,
-            dst: '',
-        };
-        const evaluation = Evaluation.deserialize(params, bytes);
+        let offset = 0;
+        const input = new DataView(bytes.buffer);
 
-        return new TokenResponse2(evaluation);
+        let len = VOPRF.Ne;
+        const evaluateMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
+        offset += len;
+
+        len = 2 * VOPRF.Ns;
+        const evaluateProof = new Uint8Array(input.buffer.slice(offset, offset + len));
+
+        return new TokenResponse2(evaluateMsg, evaluateProof);
     }
 
     serialize(): Uint8Array {
-        return this.evaluation.serialize();
+        return new Uint8Array(joinAll([this.evaluateMsg, this.evaluateProof]));
     }
 }
 
 export class Issuer2 {
-    static readonly TYPE = VOPRF;
-
     private vServer: VOPRFServer;
 
     constructor(
@@ -155,14 +177,25 @@ export class Issuer2 {
         private privateKey: Uint8Array,
         public publicKey: Uint8Array,
     ) {
-        this.vServer = new VOPRFServer(VOPRF_SUITE, this.privateKey);
+        this.vServer = new VOPRFServer(VOPRF.suite, this.privateKey);
     }
 
     async issue(tokReq: TokenRequest2): Promise<TokenResponse2> {
-        const blindedElt = VOPRF_GROUP.desElt(tokReq.blindedMsg);
+        const blindedElt = VOPRF.group.desElt(tokReq.blindedMsg);
         const evalReq = new EvaluationRequest([blindedElt]);
         const evaluation = await this.vServer.blindEvaluate(evalReq);
-        return new TokenResponse2(evaluation);
+
+        if (evaluation.evaluated.length !== 1) {
+            throw new Error('evaluation is of a non-single element');
+        }
+        const evaluateMsg = evaluation.evaluated[0].serialize();
+
+        if (typeof evaluation.proof === 'undefined') {
+            throw new Error('evaluation has no DLEQ proof');
+        }
+        const evaluateProof = evaluation.proof.serialize();
+
+        return new TokenResponse2(evaluateMsg, evaluateProof);
     }
 
     verify(token: Token): Promise<boolean> {
@@ -172,8 +205,6 @@ export class Issuer2 {
 }
 
 export class Client2 {
-    static readonly TYPE = VOPRF;
-
     private finData?: {
         vClient: VOPRFClient;
         authInput: AuthenticatorInput;
@@ -186,26 +217,31 @@ export class Client2 {
     ): Promise<TokenRequest2> {
         // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#section-6.1
         const nonce = crypto.getRandomValues(new Uint8Array(32));
-        const context = new Uint8Array(await crypto.subtle.digest('SHA-256', tokChl.serialize()));
+        const challengeDigest = new Uint8Array(
+            await crypto.subtle.digest('SHA-256', tokChl.serialize()),
+        );
 
         const tokenKeyId = await getTokenKeyID(issuerPublicKey);
         const authInput = new AuthenticatorInput(
-            Client2.TYPE,
-            Client2.TYPE.value,
+            VOPRF,
+            VOPRF.value,
             nonce,
-            context,
+            challengeDigest,
             tokenKeyId,
         );
         const tokenInput = authInput.serialize();
 
-        const vClient = new VOPRFClient(VOPRF_SUITE, issuerPublicKey);
+        const vClient = new VOPRFClient(VOPRF.suite, issuerPublicKey);
         const [finData, evalReq] = await vClient.blind([tokenInput]);
-        const trucatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
+        // "truncated_token_key_id" is the least significant byte of the
+        // token_key_id in network byte order (in other words, the
+        // last 8 bits of token_key_id).
+        const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
 
         if (evalReq.blinded.length !== 1) {
             throw new Error('created a non-single blinded element');
         }
-        const tokenRequest = new TokenRequest2(trucatedTokenKeyId, evalReq.blinded[0].serialize());
+        const tokenRequest = new TokenRequest2(truncatedTokenKeyId, evalReq.blinded[0].serialize());
 
         this.finData = { vClient, authInput, finData };
 
@@ -217,11 +253,14 @@ export class Client2 {
             throw new Error('no token request was created yet');
         }
 
+        const proof = DLEQProof.deserialize(VOPRF.dleqParams, tokRes.evaluateProof);
+        const evaluateMsg = VOPRF.group.desElt(tokRes.evaluateMsg);
+        const evaluation = new Evaluation(Oprf.Mode.VOPRF, [evaluateMsg], proof);
         const [authenticator] = await this.finData.vClient.finalize(
             this.finData.finData,
-            tokRes.evaluation,
+            evaluation,
         );
-        const token = new Token(Client2.TYPE, this.finData.authInput, authenticator);
+        const token = new Token(VOPRF, this.finData.authInput, authenticator);
 
         this.finData = undefined;
 

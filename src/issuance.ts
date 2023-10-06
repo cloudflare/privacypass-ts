@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { Evaluation, Oprf } from '@cloudflare/voprf-ts';
 import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import { Client2, TokenResponse2 } from './priv_verif_token.js';
 import { Client, TokenResponse } from './pub_verif_token.js';
@@ -32,7 +31,7 @@ export interface IssuerConfig {
     'token-keys': Array<TokenKey>;
 }
 
-// Fetch defaut issuer configuration.
+// Fetch default issuer configuration.
 export async function getIssuerUrl(issuerName: string): Promise<string> {
     const baseURL = `https://${issuerName}`;
     const configURI = `${baseURL}${PRIVATE_TOKEN_ISSUER_DIRECTORY}`;
@@ -91,7 +90,6 @@ export async function issuanceProtocolPub(
     const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
     const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
     const tokRes = TokenResponse.deserialize(tokResBytes);
-    tokRes.blindSig = new Uint8Array();
     const token = await client.finalize(tokRes);
     return new AuthorizationHeader(token);
 }
@@ -104,7 +102,6 @@ export async function issuanceProtocolPriv(
     const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
     const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
     const tokRes = TokenResponse2.deserialize(tokResBytes);
-    tokRes.evaluation = new Evaluation(Oprf.Mode.VOPRF, [], undefined);
     const token = await client.finalize(tokRes);
     return new AuthorizationHeader(token);
 }
