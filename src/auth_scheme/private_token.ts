@@ -29,7 +29,7 @@ import {
 } from './rfc9110.js';
 import { joinAll } from '../util.js';
 
-const AUTH_SCHEME_NAME = 'PrivateToken';
+export const AUTH_SCHEME_NAME = 'PrivateToken';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-12#name-token-type-registry
 export interface TokenTypeEntry {
@@ -40,8 +40,6 @@ export interface TokenTypeEntry {
     privateMetadata: boolean;
     Nk: number;
     Nid: number;
-    reference?: string;
-    notes?: string;
 }
 
 export class TokenChallenge {
@@ -286,7 +284,7 @@ export class WWWAuthenticateHeader {
         public challenge: TokenChallenge,
         public tokenKey: Uint8Array,
         public maxAge?: number, // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
-    ) {}
+    ) { }
 
     private static parseSingle(data: string): WWWAuthenticateHeader {
         // Consumes data:
@@ -378,7 +376,7 @@ export class WWWAuthenticateHeader {
 }
 
 export class AuthorizationHeader {
-    constructor(public token: Token) {}
+    constructor(public token: Token) { }
 
     private static parseSingle(tokenTypeEntry: TokenTypeEntry, data: string): AuthorizationHeader {
         // Consumes data:

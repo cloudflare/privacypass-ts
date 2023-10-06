@@ -3,11 +3,12 @@
 
 import * as asn1js from 'asn1js';
 
-// Convert a RSA-PSS key into a RSA Encryption key.
-// This is required because browsers do not support import RSA-PSS keys.
+// Converts a RSA-PSS key into a RSA Encryption key.
+// Required because WebCrypto do not support importing keys with `RSASSA-PSS` OID,
 //
 // Chromium: https://www.chromium.org/blink/webcrypto/#supported-key-formats
 // Firefox: https://github.com/mozilla/pkipolicy/blob/master/rootstore/policy.md#511-rsa
+// WebCrypto: https://github.com/w3c/webcrypto/pull/325
 //
 // Documentation: https://www.rfc-editor.org/rfc/rfc4055#section-6
 export function convertRSASSAPSSToEnc(keyRSAPSSEncSpki: Uint8Array): Uint8Array {

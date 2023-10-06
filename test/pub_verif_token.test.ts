@@ -20,7 +20,7 @@ import {
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-test-vectors
-import vectors from './testdata/publicverif_v11.json';
+import vectors from './test_data/pub_verif_v11.json';
 
 type Vectors = (typeof vectors)[number];
 
