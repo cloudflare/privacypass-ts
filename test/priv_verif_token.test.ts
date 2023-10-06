@@ -18,8 +18,8 @@ import {
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-test-vectors
-import vectors from './test_data/priv_verif_v11.json';
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
+import vectors from './test_data/priv_verif_v16.json';
 
 type Vectors = (typeof vectors)[number];
 
@@ -49,13 +49,16 @@ test.each(vectors)('PrivateVerifiable-Vector-%#', async (v: Vectors) => {
     testSerialize(TokenResponse2, tokRes);
 
     const tokResSer = tokRes.serialize();
-    // TODO: Update reference test vectors.
-    // A tokenResponse is an element and a randomized proof.
-    //    expect(uint8ToHex(tokResSer)).toBe(v.token_response);
-    // Checking only the element:
-    expect(tokResSer.slice(0, VOPRF.Ne)).toStrictEqual(
-        hexToUint8(v.token_response).slice(0, VOPRF.Ne),
-    );
+
+    // TODO: Incomplete test vectors in specification.
+    // A tokenResponse is composed of an element and a randomized proof.
+    // Checking only the element, and that the proof verifies.
+    // but not exactly the proof bytes.
+    //
+    //     expect(uint8ToHex(tokResSer)).toBe(v.token_response);
+    const proofElement = tokResSer.slice(0, VOPRF.Ne);
+    const vectorProofElement = hexToUint8(v.token_response).slice(0, VOPRF.Ne);
+    expect(proofElement).toStrictEqual(vectorProofElement);
 
     const token = await client.finalize(tokRes);
     testSerializeType(TOKEN_TYPES.VOPRF, Token, token);

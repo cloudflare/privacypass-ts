@@ -18,7 +18,7 @@
 //     |<---- |    PrivateToken token     | ----+
 //     |                                        |
 //
-// Figure 1: Challenge-response redemption protocol flow.
+// Figure 1: Challenge and redemption protocol flow
 
 import { base64url } from 'rfc4648';
 
@@ -31,7 +31,7 @@ import { joinAll } from '../util.js';
 
 export const AUTH_SCHEME_NAME = 'PrivateToken';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-12#name-token-type-registry
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-type-registry
 export interface TokenTypeEntry {
     value: number;
     name: string;
@@ -44,6 +44,7 @@ export interface TokenTypeEntry {
 
 export class TokenChallenge {
     // This class represents the following structure:
+    // See https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-challenge
     //
     // struct {
     //     uint16_t token_type;
@@ -51,6 +52,8 @@ export class TokenChallenge {
     //     opaque redemption_context<0..32>;
     //     opaque origin_info<0..2^16-1>;
     // } TokenChallenge;
+
+    static readonly REDEMPTION_CONTEXT_LENGTH = [0, 32];
 
     constructor(
         public readonly tokenType: number,
@@ -70,7 +73,7 @@ export class TokenChallenge {
             }
         }
 
-        if (!(redemptionContext.length == 0 || redemptionContext.length == 32)) {
+        if (!TokenChallenge.REDEMPTION_CONTEXT_LENGTH.includes(redemptionContext.length)) {
             throw new Error('invalid redemptionContext size');
         }
     }
@@ -152,6 +155,7 @@ export class TokenChallenge {
 
 export class AuthenticatorInput {
     // This class represents the following structure:
+    // See https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-verification
     //
     // struct {
     //     uint16_t token_type;
@@ -162,6 +166,7 @@ export class AuthenticatorInput {
 
     static readonly NONCE_LENGTH = 32;
     static readonly CHALLENGE_LENGTH = 32;
+
     constructor(
         tokenTypeEntry: TokenTypeEntry,
         public readonly tokenType: number,
@@ -238,6 +243,7 @@ export class AuthenticatorInput {
 
 export class Token {
     // This class represents the following structure:
+    // See https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-structure
     //
     // struct {
     //     uint16_t token_type;
@@ -279,12 +285,16 @@ export class Token {
     }
 }
 
+// WWWAuthenticateHeader handles the parsing of the WWW-Authenticate header
+// under the PrivateToken scheme.
+//
+// See: https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-sending-token-challenges
 export class WWWAuthenticateHeader {
     constructor(
         public challenge: TokenChallenge,
         public tokenKey: Uint8Array,
         public maxAge?: number, // an optional parameter that consists of the number of seconds for which the challenge will be accepted by the origin.
-    ) { }
+    ) {}
 
     private static parseSingle(data: string): WWWAuthenticateHeader {
         // Consumes data:
@@ -375,8 +385,12 @@ export class WWWAuthenticateHeader {
     }
 }
 
+// AuthorizationHeader handles the parsing of the Authorization header
+// under the PrivateToken scheme.
+//
+// See https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-sending-tokens
 export class AuthorizationHeader {
-    constructor(public token: Token) { }
+    constructor(public token: Token) {}
 
     private static parseSingle(tokenTypeEntry: TokenTypeEntry, data: string): AuthorizationHeader {
         // Consumes data:

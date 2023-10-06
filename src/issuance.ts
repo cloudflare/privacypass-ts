@@ -5,9 +5,10 @@ import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/privat
 import { Client2, TokenResponse2 } from './priv_verif_token.js';
 import { Client, TokenResponse } from './pub_verif_token.js';
 
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-well-known-private-token-is
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#section-8.3
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-media-types
 export enum MediaType {
     PRIVATE_TOKEN_ISSUER_DIRECTORY = 'application/private-token-issuer-directory',
     PRIVATE_TOKEN_REQUEST = 'application/private-token-request',
@@ -16,7 +17,7 @@ export enum MediaType {
 
 // Issuer 'token-keys' object description'
 //
-// See Table 2 of https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-configuration
+// See Table 2 of https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-configuration
 export interface TokenKey {
     'token-type': number;
     'token-key': string;
@@ -25,7 +26,7 @@ export interface TokenKey {
 
 // Issuer directory object description
 //
-// See Table 1 of https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#name-configuration
+// See Table 1 of https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-configuration
 export interface IssuerConfig {
     'issuer-request-uri': string;
     'token-keys': Array<TokenKey>;
@@ -77,7 +78,7 @@ export async function sendTokenRequest(
         throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
     }
 
-    //  Receive a bytes corresponding to a TokenResponse,
+    // Receive a stream of bytes corresponding to a serialized TokenResponse,
     const tokResBytes = new Uint8Array(await issuerResponse.arrayBuffer());
     return { tokResBytes };
 }
