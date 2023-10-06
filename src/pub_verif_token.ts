@@ -1,21 +1,23 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { SUITES } from '@cloudflare/blindrsa-ts';
+import { BlindRSA, SUITES } from '@cloudflare/blindrsa-ts';
 
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
 import {
     AuthenticatorInput,
     Token,
     TokenChallenge,
-    AuthenticatorInput,
     type TokenTypeEntry,
 } from './auth_scheme/private_token.js';
 
 // Token Type Entry Update:
 //  - Token Type Blind RSA (2048-bit)
 //
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
+// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-blind-rsa-2048-b',
+// TODO: Add support for both modes:
+// notes: "The RSABSSA-SHA384-PSS-Deterministic and RSABSSA-SHA384-PSSZERO-Deterministic variants are supported"
+// notes: 'Only the RSABSSA-SHA384-PSS-Deterministic is supported',
 export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     value: 0x0002,
     name: 'Blind RSA (2048)',
@@ -24,11 +26,6 @@ export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     publicVerifiable: true,
     publicMetadata: false,
     privateMetadata: false,
-    reference:
-        'https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-blind-rsa-2048-b',
-    // TODO: Add support for both modes:
-    // notes: "The RSABSSA-SHA384-PSS-Deterministic and RSABSSA-SHA384-PSSZERO-Deterministic variants are supported"
-    notes: 'Only the RSABSSA-SHA384-PSS-Deterministic is supported',
 } as const;
 
 export function keyGen(): Promise<CryptoKeyPair> {
@@ -201,8 +198,9 @@ export class Client {
         const pkIssuer = await getCryptoKey(issuerPublicKey);
 
         const { blindedMsg, inv } = await blindRSA.blind(pkIssuer, tokenInput);
-        // "truncated_token_key_id" is the least significant byte of the token_key_id
-        // in network byte order (in other words, the last 8 bits of token_key_id).
+        // "truncated_token_key_id" is the least significant byte of the
+        // token_key_id in network byte order (in other words, the
+        // last 8 bits of token_key_id).
         const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
         const tokenRequest = new TokenRequest(truncatedTokenKeyId, blindedMsg);
 

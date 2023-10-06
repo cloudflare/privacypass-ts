@@ -5,7 +5,7 @@ import { base64url } from 'rfc4648';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
 import { BLIND_RSA } from './pub_verif_token.js';
 import { VOPRF } from './priv_verif_token.js';
-import { type TokenTypeEntry, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import { issuanceProtocolPriv, issuanceProtocolPub } from './issuance.js';
 
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
@@ -19,7 +19,7 @@ export * from './issuance.js';
 //  - Token Type Blind RSA (2048-bit)
 //
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
-export const TOKEN_TYPES: Record<string, Readonly<TokenTypeEntry>> = {
+export const TOKEN_TYPES = {
     // Token Type Blind RSA (2048-bit)
     BLIND_RSA,
     // Token Type VOPRF (P-384, SHA-384)
