@@ -2,7 +2,7 @@
     "extends": "../tsconfig.json",
     "include": [
         ".",
-        "testdata/*.json"
+        "test_data/*.json"
     ],
     "compilerOptions": {
         "resolveJsonModule": true

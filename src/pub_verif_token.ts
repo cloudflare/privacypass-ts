@@ -14,7 +14,7 @@ import {
 // Token Type Entry Update:
 //  - Token Type Blind RSA (2048-bit)
 //
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-12#name-token-type-registry-updates
+// https://ietf-wg-privacypass.github.io/base-drafts/draft-ietf-privacypass-protocol.html#name-token-type-blind-rsa-2048-b
 export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     value: 0x0002,
     name: 'Blind RSA (2048)',
@@ -23,8 +23,6 @@ export const BLIND_RSA: Readonly<TokenTypeEntry> = {
     publicVerifiable: true,
     publicMetadata: false,
     privateMetadata: false,
-    reference:
-        'https://ietf-wg-privacypass.github.io/base-drafts/draft-ietf-privacypass-protocol.html#name-token-type-blind-rsa-2048-b',
 } as const;
 
 export function keyGen(): Promise<CryptoKeyPair> {
@@ -41,7 +39,11 @@ export function keyGen(): Promise<CryptoKeyPair> {
 }
 
 function getCryptoKey(publicKey: Uint8Array): Promise<CryptoKey> {
+    // Converts a RSA-PSS key into a RSA Encryption key.
+    // Required because WebCrypto do not support importing keys with `RSASSA-PSS` OID,
+    // See https://github.com/w3c/webcrypto/pull/325
     const spkiEncoded = convertRSASSAPSSToEnc(publicKey);
+
     return crypto.subtle.importKey(
         'spki',
         spkiEncoded,
@@ -143,7 +145,7 @@ export class Issuer {
         public name: string,
         private privateKey: CryptoKey,
         public publicKey: CryptoKey,
-    ) {}
+    ) { }
 
     async issue(tokReq: TokenRequest): Promise<TokenResponse> {
         const blindRSA = SUITES.SHA384.PSS.Deterministic();
@@ -183,8 +185,10 @@ export class Client {
         const pkIssuer = await getCryptoKey(issuerPublicKey);
 
         const { blindedMsg, inv } = await blindRSA.blind(pkIssuer, tokenInput);
-        const trucatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
-        const tokenRequest = new TokenRequest(trucatedTokenKeyId, blindedMsg);
+        // "truncated_token_key_id" is the least significant byte of the token_key_id
+        // in network byte order (in other words, the last 8 bits of token_key_id).
+        const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
+        const tokenRequest = new TokenRequest(truncatedTokenKeyId, blindedMsg);
 
         this.finData = { tokenInput, authInput, inv, pkIssuer };
 

@@ -1,9 +1,9 @@
-import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/util';
+import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/util.js';
 
-describe('rsapss', () => {
+describe('RSA-PSS', () => {
     it('should export a key', async () => {
-        // generate a keypair
-        const keypair = (await crypto.subtle.generateKey(
+        // generates a keyPair
+        const keyPair = (await crypto.subtle.generateKey(
             {
                 name: 'RSA-PSS',
                 modulusLength: 2048,
@@ -16,7 +16,7 @@ describe('rsapss', () => {
 
         // export the public key as RFC-5756 RSASSA-PSS, and import it again
         const publicKey = new Uint8Array(
-            (await crypto.subtle.exportKey('spki', keypair.publicKey)) as ArrayBuffer,
+            (await crypto.subtle.exportKey('spki', keyPair.publicKey)) as ArrayBuffer,
         );
         const publicKeyEnc = convertEncToRSASSAPSS(publicKey);
         const spkiEncoded = convertRSASSAPSSToEnc(publicKeyEnc);
@@ -36,7 +36,7 @@ describe('rsapss', () => {
         const message = 'Hello World!';
         const signature = await crypto.subtle.sign(
             { name: 'RSA-PSS', saltLength: 48 },
-            keypair.privateKey,
+            keyPair.privateKey,
             new TextEncoder().encode(message),
         );
         const verified = await crypto.subtle.verify(
