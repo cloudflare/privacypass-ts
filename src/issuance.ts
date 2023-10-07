@@ -3,7 +3,7 @@
 
 import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import { Client2, TokenResponse2 } from './priv_verif_token.js';
-import { Client, TokenResponse } from './pub_verif_token.js';
+import { BlindRSAMode, Client, TokenResponse } from './pub_verif_token.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-well-known-private-token-is
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
@@ -87,7 +87,7 @@ export async function issuanceProtocolPub(
     header: WWWAuthenticateHeader,
 ): Promise<AuthorizationHeader> {
     const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
-    const client = new Client();
+    const client = new Client(BlindRSAMode.PSS);
     const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
     const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
     const tokRes = TokenResponse.deserialize(tokResBytes);

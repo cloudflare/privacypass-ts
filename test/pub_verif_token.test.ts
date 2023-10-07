@@ -15,6 +15,7 @@ import {
     Token,
     verifyToken,
     AuthorizationHeader,
+    BlindRSAMode,
 } from '../src/index.js';
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
@@ -60,6 +61,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     expect(publicKey).toBeDefined();
 
     const salt = hexToUint8(v.salt);
+    const mode = salt.length == BlindRSAMode.PSS ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
     const nonce = hexToUint8(v.nonce);
     const blind = hexToUint8(v.blind);
     const challengeSerialized = hexToUint8(v.token_challenge);
@@ -71,14 +73,14 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
         .mockReturnValueOnce(salt)
         .mockReturnValueOnce(blind);
 
-    const client = new Client();
+    const client = new Client(mode);
     const tokReq = await client.createTokenRequest(tokChl, publicKeyEnc);
     testSerialize(TokenRequest, tokReq);
 
     const tokReqSer = tokReq.serialize();
     expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
 
-    const issuer = new Issuer('issuer.example.com', privateKey, publicKey);
+    const issuer = new Issuer(mode, 'issuer.example.com', privateKey, publicKey);
     const tokRes = await issuer.issue(tokReq);
     testSerialize(TokenResponse, tokRes);
 
@@ -91,7 +93,7 @@ test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
     const tokenSer = token.serialize();
     expect(uint8ToHex(tokenSer)).toBe(v.token);
 
-    expect(await verifyToken(token, issuer.publicKey)).toBe(true);
+    expect(await verifyToken(mode, token, issuer.publicKey)).toBe(true);
 
     const header = new AuthorizationHeader(token).toString();
     const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
