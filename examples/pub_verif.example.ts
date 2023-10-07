@@ -1,21 +1,33 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { Client2, Issuer2, TOKEN_TYPES, TokenChallenge, keyGen2 } from '../src/index.js';
+import {
+    verifyToken,
+    Client,
+    Issuer,
+    keyGen,
+    TOKEN_TYPES,
+    TokenChallenge,
+    getPublicKeyBytes,
+    BlindRSAMode,
+} from '../src/index.js';
 
-export async function privateVerifiableTokens(): Promise<void> {
+async function rsaVariant(mode: BlindRSAMode): Promise<void> {
     // Protocol Setup
     //
-    // [ Everybody ] agree to use Private-Verifiable Tokens.
-    const tokenType = TOKEN_TYPES.VOPRF.value;
+    // [ Everybody ] agree to use Public Verifiable Tokens.
+    const tokenType = TOKEN_TYPES.BLIND_RSA.value;
 
     // [ Issuer ] creates a key pair.
-    const keys = await keyGen2();
-    const issuer = new Issuer2('issuer.com', keys.privateKey, keys.publicKey);
-    const pkIssuer = issuer.publicKey;
+    const keys = await keyGen(mode, {
+        modulusLength: 2048,
+        publicExponent: Uint8Array.from([1, 0, 1]),
+    });
+    const issuer = new Issuer(mode, 'issuer.com', keys.privateKey, keys.publicKey);
+    const pkIssuer = await getPublicKeyBytes(issuer.publicKey);
 
     // [ Client ] creates a state.
-    const client = new Client2();
+    const client = new Client(mode);
 
     // Online Protocol
     //
@@ -39,6 +51,14 @@ export async function privateVerifiableTokens(): Promise<void> {
     const token = await client.finalize(tokRes);
     //     |<-- Request+Token ---+                   |           |
     //     |                     |                   |           |
-    const isValid = await issuer.verify(token);
-    console.log(`Private-Verifiable token is valid: ${isValid}`);
+    const isValid = await /*Origin*/ verifyToken(mode, token, issuer.publicKey);
+
+    console.log('Public-Verifiable tokens');
+    console.log(`    Suite: ${TOKEN_TYPES.BLIND_RSA.suite[mode as BlindRSAMode]()}`);
+    console.log(`    Valid token: ${isValid}`);
+}
+
+export async function publicVerifiableTokens() {
+    await rsaVariant(BlindRSAMode.PSS);
+    await rsaVariant(BlindRSAMode.PSSZero);
 }

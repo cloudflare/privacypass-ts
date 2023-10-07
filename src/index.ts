@@ -65,7 +65,9 @@ export async function header_to_token(header: string): Promise<string | null> {
             authHeader = await issuanceProtocolPub(pt);
             break;
         default:
-            console.log(`unrecognized or non-supported token type in the challenge: ${pt.challenge.tokenType}`);
+            console.log(
+                `unrecognized or non-supported token type in the challenge: ${pt.challenge.tokenType}`,
+            );
             return null;
     }
 

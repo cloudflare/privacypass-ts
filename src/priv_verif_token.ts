@@ -83,11 +83,11 @@ export class TokenRequest2 {
 
     tokenType: number;
     constructor(
-        public truncatedTokenKeyId: number,
-        public blindedMsg: Uint8Array,
+        public readonly truncatedTokenKeyId: number,
+        public readonly blindedMsg: Uint8Array,
     ) {
         if (blindedMsg.length !== VOPRF.Ne) {
-            throw new Error('invalid blinded message size');
+            throw new Error('blinded message has invalide size');
         }
 
         this.tokenType = VOPRF.value;
@@ -139,8 +139,8 @@ export class TokenResponse2 {
     //  } TokenResponse;
 
     constructor(
-        public evaluateMsg: Uint8Array,
-        public evaluateProof: Uint8Array,
+        public readonly evaluateMsg: Uint8Array,
+        public readonly evaluateProof: Uint8Array,
     ) {
         if (evaluateMsg.length !== VOPRF.Ne) {
             throw new Error('evaluate_msg has invalid size');
@@ -152,14 +152,12 @@ export class TokenResponse2 {
 
     static deserialize(bytes: Uint8Array): TokenResponse2 {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
-
         let len = VOPRF.Ne;
-        const evaluateMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
+        const evaluateMsg = new Uint8Array(bytes.slice(offset, offset + len));
         offset += len;
 
         len = 2 * VOPRF.Ns;
-        const evaluateProof = new Uint8Array(input.buffer.slice(offset, offset + len));
+        const evaluateProof = new Uint8Array(bytes.slice(offset, offset + len));
 
         return new TokenResponse2(evaluateMsg, evaluateProof);
     }
@@ -167,6 +165,12 @@ export class TokenResponse2 {
     serialize(): Uint8Array {
         return new Uint8Array(joinAll([this.evaluateMsg, this.evaluateProof]));
     }
+}
+
+export function verifyToken2(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
+    const vServer = new VOPRFServer(VOPRF.suite, privateKeyIssuer);
+    const authInput = token.authInput.serialize();
+    return vServer.verifyFinalize(authInput, token.authenticator);
 }
 
 export class Issuer2 {
@@ -215,7 +219,6 @@ export class Client2 {
         tokChl: TokenChallenge,
         issuerPublicKey: Uint8Array,
     ): Promise<TokenRequest2> {
-        // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-11#section-6.1
         const nonce = crypto.getRandomValues(new Uint8Array(32));
         const challengeDigest = new Uint8Array(
             await crypto.subtle.digest('SHA-256', tokChl.serialize()),
@@ -233,15 +236,16 @@ export class Client2 {
 
         const vClient = new VOPRFClient(VOPRF.suite, issuerPublicKey);
         const [finData, evalReq] = await vClient.blind([tokenInput]);
+        if (evalReq.blinded.length !== 1) {
+            throw new Error('created a non-single blinded element');
+        }
+        const blindedMsg = evalReq.blinded[0].serialize();
+
         // "truncated_token_key_id" is the least significant byte of the
         // token_key_id in network byte order (in other words, the
         // last 8 bits of token_key_id).
         const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
-
-        if (evalReq.blinded.length !== 1) {
-            throw new Error('created a non-single blinded element');
-        }
-        const tokenRequest = new TokenRequest2(truncatedTokenKeyId, evalReq.blinded[0].serialize());
+        const tokenRequest = new TokenRequest2(truncatedTokenKeyId, blindedMsg);
 
         this.finData = { vClient, authInput, finData };
 
