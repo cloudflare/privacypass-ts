@@ -4,17 +4,8 @@
 import { jest } from '@jest/globals';
 import { VOPRFClient } from '@cloudflare/voprf-ts';
 
-import {
-    Client2,
-    Issuer2,
-    TokenRequest2,
-    TokenResponse2,
-    TokenChallenge,
-    TOKEN_TYPES,
-    Token,
-    AuthorizationHeader,
-    VOPRF,
-} from '../src/index.js';
+import { Client, Issuer, TokenRequest, TokenResponse, VOPRF } from '../src/priv_verif_token.js';
+import { TokenChallenge, TOKEN_TYPES, Token, AuthorizationHeader } from '../src/index.js';
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
@@ -37,16 +28,16 @@ test.each(vectors)('PrivateVerifiable-Vector-%#', async (v: Vectors) => {
         Promise.resolve(TOKEN_TYPES.VOPRF.group.desScalar(blind)),
     );
 
-    const client = new Client2();
+    const client = new Client();
     const tokReq = await client.createTokenRequest(tokChl, publicKey);
-    testSerialize(TokenRequest2, tokReq);
+    testSerialize(TokenRequest, tokReq);
 
     const tokReqSer = tokReq.serialize();
     expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
 
-    const issuer = new Issuer2('issuer.example.com', privateKey, publicKey);
+    const issuer = new Issuer('issuer.example.com', privateKey, publicKey);
     const tokRes = await issuer.issue(tokReq);
-    testSerialize(TokenResponse2, tokRes);
+    testSerialize(TokenResponse, tokRes);
 
     const tokResSer = tokRes.serialize();
 

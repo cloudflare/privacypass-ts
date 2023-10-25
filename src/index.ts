@@ -2,16 +2,14 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { base64url } from 'rfc4648';
+import { WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { Client as PublicVerifClient, BLIND_RSA, BlindRSAMode } from './pub_verif_token.js';
+import { Client as PrivateVerifClient, VOPRF } from './priv_verif_token.js';
+import { fetchToken, type PrivacyPassClient } from './issuance.js';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
-import { BLIND_RSA } from './pub_verif_token.js';
-import { VOPRF } from './priv_verif_token.js';
-import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
-import { issuanceProtocolPriv, issuanceProtocolPub } from './issuance.js';
 
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
 export * from './auth_scheme/private_token.js';
-export * from './pub_verif_token.js';
-export * from './priv_verif_token.js';
 export * from './issuance.js';
 
 // Privacy Pass Token Type Registry
@@ -35,13 +33,11 @@ export const TOKEN_TYPES = {
 // | Origin |                               | Client |
 // +---+----+                               +---+----+
 //     |                                        |
-//     |      | WWW-Authenticate:         |     |
-//     +----- |    PrivateToken challenge | --->|
+//     +-- WWW-Authenticate: TokenChallenge --->|
 //     |                                        |
 //     |                            (Run issuance protocol)
 //     |                                        |
-//     |      | Authorization:            |     |
-//     |<---- |    PrivateToken token     | ----+
+//     |<------ Authorization: Token -----------+
 //     |                                        |
 //
 
@@ -56,13 +52,14 @@ export async function header_to_token(header: string): Promise<string | null> {
 
     // On the presence of multiple challenges, it takes the first one.
     const pt = privateTokens[0];
-    let authHeader: AuthorizationHeader;
+
+    let client: PrivacyPassClient;
     switch (pt.challenge.tokenType) {
         case TOKEN_TYPES.VOPRF.value:
-            authHeader = await issuanceProtocolPriv(pt);
+            client = new PrivateVerifClient();
             break;
         case TOKEN_TYPES.BLIND_RSA.value:
-            authHeader = await issuanceProtocolPub(pt);
+            client = new PublicVerifClient(BlindRSAMode.PSS);
             break;
         default:
             console.log(
@@ -72,6 +69,7 @@ export async function header_to_token(header: string): Promise<string | null> {
     }
 
     const te = new TextEncoder();
+    const authHeader = await fetchToken(client, pt);
     const encodedToken = base64url.stringify(te.encode(authHeader.toString()));
     return encodedToken;
 }

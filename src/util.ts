@@ -131,3 +131,11 @@ export function joinAll(a: ArrayBuffer[]): ArrayBuffer {
 
     return buffer;
 }
+
+export interface CanSerialize {
+    serialize(): Uint8Array;
+}
+
+export interface CanDeserialize<T extends CanSerialize> {
+    deserialize(_b: Uint8Array): T;
+}

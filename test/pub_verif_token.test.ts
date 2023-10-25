@@ -9,14 +9,10 @@ import {
     Issuer,
     TokenRequest,
     TokenResponse,
-    util,
-    TokenChallenge,
-    TOKEN_TYPES,
-    Token,
     verifyToken,
-    AuthorizationHeader,
     BlindRSAMode,
-} from '../src/index.js';
+} from '../src/pub_verif_token.js';
+import { util, TokenChallenge, TOKEN_TYPES, Token, AuthorizationHeader } from '../src/index.js';
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
