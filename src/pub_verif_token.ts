@@ -231,6 +231,10 @@ export class Client {
         return tokenRequest;
     }
 
+    deserializeTokenResponse(bytes: Uint8Array): TokenResponse {
+        return TokenResponse.deserialize(bytes);
+    }
+
     async finalize(tokRes: TokenResponse): Promise<Token> {
         if (!this.finData) {
             throw new Error('no token request was created yet');

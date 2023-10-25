@@ -1,9 +1,13 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { AuthorizationHeader, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
-import { Client2, TokenResponse2 } from './priv_verif_token.js';
-import { BlindRSAMode, Client, TokenResponse } from './pub_verif_token.js';
+import {
+    AuthorizationHeader,
+    Token,
+    TokenChallenge,
+    WWWAuthenticateHeader,
+} from './auth_scheme/private_token.js';
+import type { CanSerialize } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-well-known-private-token-is
 export const PRIVATE_TOKEN_ISSUER_DIRECTORY = '/.well-known/private-token-issuer-directory';
@@ -55,9 +59,9 @@ export async function getIssuerUrl(issuerName: string): Promise<string> {
 // Send TokenRequest to Issuer (fetch w/POST).
 export async function sendTokenRequest(
     tokReqBytes: Uint8Array,
-    issuerUrl: string,
-    headers?: Headers,
-): Promise<{ tokResBytes: Uint8Array }> {
+    issuerUrl: RequestInfo | URL,
+    headers = new Headers(),
+): Promise<Uint8Array> {
     headers ??= new Headers();
     headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
     headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
@@ -75,34 +79,34 @@ export async function sendTokenRequest(
     const contentType = issuerResponse.headers.get('Content-Type');
 
     if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE) {
-        throw new Error(`tokenRequest: missing ${MediaType.PRIVATE_TOKEN_RESPONSE} header`);
+        throw new Error(
+            `tokenRequest: response "Content-Type" header is not valid "${contentType}" is different from "${MediaType.PRIVATE_TOKEN_RESPONSE} header`,
+        );
     }
 
     // Receive a stream of bytes corresponding to a serialized TokenResponse,
     const tokResBytes = new Uint8Array(await issuerResponse.arrayBuffer());
-    return { tokResBytes };
+
+    return tokResBytes;
 }
 
-export async function issuanceProtocolPub(
+export interface TokenReq extends CanSerialize {}
+export interface TokenRes extends CanSerialize {}
+
+export interface PrivacyPassClient {
+    createTokenRequest(tokChl: TokenChallenge, issuerPublicKey: Uint8Array): Promise<TokenReq>;
+    deserializeTokenResponse(bytes: Uint8Array): TokenRes;
+    finalize(tokRes: TokenRes): Promise<Token>;
+}
+
+export async function fetchToken(
+    client: PrivacyPassClient,
     header: WWWAuthenticateHeader,
 ): Promise<AuthorizationHeader> {
     const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
-    const client = new Client(BlindRSAMode.PSS);
     const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
-    const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
-    const tokRes = TokenResponse.deserialize(tokResBytes);
-    const token = await client.finalize(tokRes);
-    return new AuthorizationHeader(token);
-}
-
-export async function issuanceProtocolPriv(
-    header: WWWAuthenticateHeader,
-): Promise<AuthorizationHeader> {
-    const issuerUrl = await getIssuerUrl(header.challenge.issuerName);
-    const client = new Client2();
-    const tokReq = await client.createTokenRequest(header.challenge, header.tokenKey);
-    const { tokResBytes } = await sendTokenRequest(tokReq.serialize(), issuerUrl);
-    const tokRes = TokenResponse2.deserialize(tokResBytes);
+    const tokResBytes = await sendTokenRequest(tokReq.serialize(), issuerUrl);
+    const tokRes = client.deserializeTokenResponse(tokResBytes);
     const token = await client.finalize(tokRes);
     return new AuthorizationHeader(token);
 }

@@ -66,7 +66,7 @@ export const VOPRF: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
     ...VOPRF_EXTRA_PARAMS,
 } as const;
 
-export function keyGen2(): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> {
+export function keyGen(): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> {
     return generateKeyPair(VOPRF.suite);
 }
 
@@ -74,7 +74,7 @@ async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
     return new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey));
 }
 
-export class TokenRequest2 {
+export class TokenRequest {
     // struct {
     //     uint16_t token_type = 0x0001; /* Type VOPRF(P-384, SHA-384) */
     //     uint8_t truncated_token_key_id;
@@ -93,7 +93,7 @@ export class TokenRequest2 {
         this.tokenType = VOPRF.value;
     }
 
-    static deserialize(bytes: Uint8Array): TokenRequest2 {
+    static deserialize(bytes: Uint8Array): TokenRequest {
         let offset = 0;
         const input = new DataView(bytes.buffer);
 
@@ -111,7 +111,7 @@ export class TokenRequest2 {
         const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
         offset += len;
 
-        return new TokenRequest2(truncatedTokenKeyId, blindedMsg);
+        return new TokenRequest(truncatedTokenKeyId, blindedMsg);
     }
 
     serialize(): Uint8Array {
@@ -132,7 +132,7 @@ export class TokenRequest2 {
     }
 }
 
-export class TokenResponse2 {
+export class TokenResponse {
     // struct {
     //     uint8_t evaluate_msg[Ne];
     //     uint8_t evaluate_proof[Ns+Ns];
@@ -150,7 +150,7 @@ export class TokenResponse2 {
         }
     }
 
-    static deserialize(bytes: Uint8Array): TokenResponse2 {
+    static deserialize(bytes: Uint8Array): TokenResponse {
         let offset = 0;
         let len = VOPRF.Ne;
         const evaluateMsg = new Uint8Array(bytes.slice(offset, offset + len));
@@ -159,7 +159,7 @@ export class TokenResponse2 {
         len = 2 * VOPRF.Ns;
         const evaluateProof = new Uint8Array(bytes.slice(offset, offset + len));
 
-        return new TokenResponse2(evaluateMsg, evaluateProof);
+        return new TokenResponse(evaluateMsg, evaluateProof);
     }
 
     serialize(): Uint8Array {
@@ -167,13 +167,13 @@ export class TokenResponse2 {
     }
 }
 
-export function verifyToken2(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
+export function verifyToken(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
     const vServer = new VOPRFServer(VOPRF.suite, privateKeyIssuer);
     const authInput = token.authInput.serialize();
     return vServer.verifyFinalize(authInput, token.authenticator);
 }
 
-export class Issuer2 {
+export class Issuer {
     private vServer: VOPRFServer;
 
     constructor(
@@ -184,7 +184,7 @@ export class Issuer2 {
         this.vServer = new VOPRFServer(VOPRF.suite, this.privateKey);
     }
 
-    async issue(tokReq: TokenRequest2): Promise<TokenResponse2> {
+    async issue(tokReq: TokenRequest): Promise<TokenResponse> {
         const blindedElt = VOPRF.group.desElt(tokReq.blindedMsg);
         const evalReq = new EvaluationRequest([blindedElt]);
         const evaluation = await this.vServer.blindEvaluate(evalReq);
@@ -199,7 +199,7 @@ export class Issuer2 {
         }
         const evaluateProof = evaluation.proof.serialize();
 
-        return new TokenResponse2(evaluateMsg, evaluateProof);
+        return new TokenResponse(evaluateMsg, evaluateProof);
     }
 
     verify(token: Token): Promise<boolean> {
@@ -208,7 +208,7 @@ export class Issuer2 {
     }
 }
 
-export class Client2 {
+export class Client {
     private finData?: {
         vClient: VOPRFClient;
         authInput: AuthenticatorInput;
@@ -218,7 +218,7 @@ export class Client2 {
     async createTokenRequest(
         tokChl: TokenChallenge,
         issuerPublicKey: Uint8Array,
-    ): Promise<TokenRequest2> {
+    ): Promise<TokenRequest> {
         const nonce = crypto.getRandomValues(new Uint8Array(32));
         const challengeDigest = new Uint8Array(
             await crypto.subtle.digest('SHA-256', tokChl.serialize()),
@@ -245,14 +245,18 @@ export class Client2 {
         // token_key_id in network byte order (in other words, the
         // last 8 bits of token_key_id).
         const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
-        const tokenRequest = new TokenRequest2(truncatedTokenKeyId, blindedMsg);
+        const tokenRequest = new TokenRequest(truncatedTokenKeyId, blindedMsg);
 
         this.finData = { vClient, authInput, finData };
 
         return tokenRequest;
     }
 
-    async finalize(tokRes: TokenResponse2): Promise<Token> {
+    deserializeTokenResponse(bytes: Uint8Array): TokenResponse {
+        return TokenResponse.deserialize(bytes);
+    }
+
+    async finalize(tokRes: TokenResponse): Promise<Token> {
         if (!this.finData) {
             throw new Error('no token request was created yet');
         }
