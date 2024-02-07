@@ -51,53 +51,58 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
     return [{ privateKey, publicKey }, publicKeyEnc];
 }
 
-test.each(vectors)('PublicVerifiable-Vector-%#', async (v: Vectors) => {
-    const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
-    expect(privateKey).toBeDefined();
-    expect(publicKey).toBeDefined();
+describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
+    const params = [[], [{ supportsRSARAW: true }]];
 
-    const salt = hexToUint8(v.salt);
-    const mode = salt.length == BlindRSAMode.PSS ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
-    const nonce = hexToUint8(v.nonce);
-    const blind = hexToUint8(v.blind);
-    const challengeSerialized = hexToUint8(v.token_challenge);
-    const tokChl = TokenChallenge.deserialize(challengeSerialized);
+    test.each(params)('PublicVerifiable-Vector-%#-Issuer-Params-%#', async (...params) => {
+        const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
+        expect(privateKey).toBeDefined();
+        expect(publicKey).toBeDefined();
 
-    // Mock for randomized operations.
-    jest.spyOn(crypto, 'getRandomValues')
-        .mockReturnValueOnce(nonce)
-        .mockReturnValueOnce(salt)
-        .mockReturnValueOnce(blind);
+        const salt = hexToUint8(v.salt);
+        const mode = salt.length == BlindRSAMode.PSS ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
+        const nonce = hexToUint8(v.nonce);
+        const blind = hexToUint8(v.blind);
+        const challengeSerialized = hexToUint8(v.token_challenge);
+        const tokChl = TokenChallenge.deserialize(challengeSerialized);
 
-    const client = new Client(mode);
-    const tokReq = await client.createTokenRequest(tokChl, publicKeyEnc);
-    testSerialize(TokenRequest, tokReq);
+        // Mock for randomized operations.
+        jest.spyOn(crypto, 'getRandomValues')
+            .mockReturnValueOnce(nonce)
+            .mockReturnValueOnce(salt)
+            .mockReturnValueOnce(blind);
 
-    const tokReqSer = tokReq.serialize();
-    expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
+        const client = new Client(mode);
+        const tokReq = await client.createTokenRequest(tokChl, publicKeyEnc);
+        testSerialize(TokenRequest, tokReq);
 
-    const issuer = new Issuer(mode, 'issuer.example.com', privateKey, publicKey);
-    const tokRes = await issuer.issue(tokReq);
-    testSerialize(TokenResponse, tokRes);
+        const tokReqSer = tokReq.serialize();
+        expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
+        const issuer = new Issuer(mode, 'issuer.example.com', privateKey, publicKey, ...params);
+        const tokRes = await issuer.issue(tokReq);
+        testSerialize(TokenResponse, tokRes);
 
-    const tokResSer = tokRes.serialize();
-    expect(uint8ToHex(tokResSer)).toBe(v.token_response);
+        const tokResSer = tokRes.serialize();
+        expect(uint8ToHex(tokResSer)).toBe(v.token_response);
 
-    const token = await client.finalize(tokRes);
-    testSerializeType(TOKEN_TYPES.BLIND_RSA, Token, token);
+        const token = await client.finalize(tokRes);
+        testSerializeType(TOKEN_TYPES.BLIND_RSA, Token, token);
 
-    const tokenSer = token.serialize();
-    expect(uint8ToHex(tokenSer)).toBe(v.token);
+        const tokenSer = token.serialize();
+        expect(uint8ToHex(tokenSer)).toBe(v.token);
 
-    expect(await verifyToken(mode, token, issuer.publicKey)).toBe(true);
+        expect(await verifyToken(mode, token, issuer.publicKey)).toBe(true);
 
-    const header = new AuthorizationHeader(token).toString();
-    const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
-    const parsedToken = parsedTokens[0];
-    expect(parsedTokens).toHaveLength(1);
-    expect(parsedToken.token.authInput.challengeDigest).toEqual(token.authInput.challengeDigest);
-    expect(parsedToken.token.authInput.nonce).toEqual(token.authInput.nonce);
-    expect(parsedToken.token.authInput.tokenKeyId).toEqual(token.authInput.tokenKeyId);
-    expect(parsedToken.token.authInput.tokenType).toBe(token.authInput.tokenType);
-    expect(parsedToken.token.authenticator).toEqual(token.authenticator);
+        const header = new AuthorizationHeader(token).toString();
+        const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
+        const parsedToken = parsedTokens[0];
+        expect(parsedTokens).toHaveLength(1);
+        expect(parsedToken.token.authInput.challengeDigest).toEqual(
+            token.authInput.challengeDigest,
+        );
+        expect(parsedToken.token.authInput.nonce).toEqual(token.authInput.nonce);
+        expect(parsedToken.token.authInput.tokenKeyId).toEqual(token.authInput.tokenKeyId);
+        expect(parsedToken.token.authInput.tokenType).toBe(token.authInput.tokenType);
+        expect(parsedToken.token.authenticator).toEqual(token.authenticator);
+    });
 });
