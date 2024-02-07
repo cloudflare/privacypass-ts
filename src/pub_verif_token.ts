@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { type BlindRSA, SUITES } from '@cloudflare/blindrsa-ts';
+import { type BlindRSA, type BlindRSAPlatformParams, RSABSSA } from '@cloudflare/blindrsa-ts';
 
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
 import {
@@ -17,14 +17,14 @@ export enum BlindRSAMode {
 }
 
 export interface BlindRSAExtraParams {
-    suite: Record<BlindRSAMode, () => BlindRSA>;
+    suite: Record<BlindRSAMode, (params?: BlindRSAPlatformParams) => BlindRSA>;
     rsaParams: RsaHashedImportParams;
 }
 
 const BLINDRSA_EXTRA_PARAMS: BlindRSAExtraParams = {
     suite: {
-        [BlindRSAMode.PSSZero]: SUITES.SHA384.PSSZero.Deterministic,
-        [BlindRSAMode.PSS]: SUITES.SHA384.PSS.Deterministic,
+        [BlindRSAMode.PSSZero]: RSABSSA.SHA384.PSSZero.Deterministic,
+        [BlindRSAMode.PSS]: RSABSSA.SHA384.PSS.Deterministic,
     },
     rsaParams: {
         name: 'RSA-PSS',
@@ -52,7 +52,7 @@ export function keyGen(
     algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
 ): Promise<CryptoKeyPair> {
     const suite = BLIND_RSA.suite[mode as BlindRSAMode]();
-    return suite.generateKey({ ...algorithm }, true, ['sign', 'verify']);
+    return suite.generateKey(algorithm);
 }
 
 function getCryptoKey(publicKey: Uint8Array): Promise<CryptoKey> {
@@ -172,10 +172,11 @@ export class Issuer {
         public readonly name: string,
         private readonly privateKey: CryptoKey,
         public readonly publicKey: CryptoKey,
+        public readonly params?: BlindRSAPlatformParams,
     ) {}
 
     async issue(tokReq: TokenRequest): Promise<TokenResponse> {
-        const suite = BLIND_RSA.suite[this.mode]();
+        const suite = BLIND_RSA.suite[this.mode](this.params);
         const blindSig = await suite.blindSign(this.privateKey, tokReq.blindedMsg);
         return new TokenResponse(blindSig);
     }

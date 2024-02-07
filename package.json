@@ -37,7 +37,7 @@
         "clean": "rimraf lib coverage dist"
     },
     "dependencies": {
-        "@cloudflare/blindrsa-ts": "0.1.2",
+        "@cloudflare/blindrsa-ts": "0.3.2",
         "@cloudflare/voprf-ts": "0.21.2",
         "asn1-parser": "1.1.8",
         "asn1js": "3.0.5",
