@@ -1,8 +1,8 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { TOKEN_TYPES, TokenChallenge } from '../src/index.js';
-import { Client, Issuer, keyGen } from '../src/priv_verif_token.js';
+import { TOKEN_TYPES, TokenChallenge, privateVerif } from '../src/index.js';
+const { Client, Issuer, keyGen } = privateVerif;
 
 export async function privateVerifiableTokens(): Promise<void> {
     // Protocol Setup
