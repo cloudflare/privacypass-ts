@@ -1,15 +1,9 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { TOKEN_TYPES, TokenChallenge } from '../src/index.js';
-import {
-    BlindRSAMode,
-    Client,
-    Issuer,
-    getPublicKeyBytes,
-    keyGen,
-    verifyToken,
-} from '../src/pub_verif_token.js';
+import { TOKEN_TYPES, TokenChallenge, publicVerif } from '../src/index.js';
+type BlindRSAMode = publicVerif.BlindRSAMode;
+const { BlindRSAMode, Client, Issuer, getPublicKeyBytes, keyGen, verifyToken } = publicVerif;
 
 async function rsaVariant(mode: BlindRSAMode): Promise<void> {
     // Protocol Setup

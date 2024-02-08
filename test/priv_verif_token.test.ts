@@ -4,8 +4,14 @@
 import { jest } from '@jest/globals';
 import { VOPRFClient } from '@cloudflare/voprf-ts';
 
-import { Client, Issuer, TokenRequest, TokenResponse, VOPRF } from '../src/priv_verif_token.js';
-import { TokenChallenge, TOKEN_TYPES, Token, AuthorizationHeader } from '../src/index.js';
+import {
+    TokenChallenge,
+    TOKEN_TYPES,
+    Token,
+    AuthorizationHeader,
+    privateVerif,
+} from '../src/index.js';
+const { Client, Issuer, TokenRequest, TokenResponse, VOPRF } = privateVerif;
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 

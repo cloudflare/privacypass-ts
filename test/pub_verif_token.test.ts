@@ -5,14 +5,14 @@ import { jest } from '@jest/globals';
 import { base64 } from 'rfc4648';
 
 import {
-    Client,
-    Issuer,
-    TokenRequest,
-    TokenResponse,
-    verifyToken,
-    BlindRSAMode,
-} from '../src/pub_verif_token.js';
-import { util, TokenChallenge, TOKEN_TYPES, Token, AuthorizationHeader } from '../src/index.js';
+    util,
+    TokenChallenge,
+    TOKEN_TYPES,
+    Token,
+    AuthorizationHeader,
+    publicVerif,
+} from '../src/index.js';
+const { Client, Issuer, TokenRequest, TokenResponse, verifyToken, BlindRSAMode } = publicVerif;
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
