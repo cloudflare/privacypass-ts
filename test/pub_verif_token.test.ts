@@ -11,6 +11,7 @@ import {
     Token,
     AuthorizationHeader,
     publicVerif,
+    tokenRequestToTokenTypeEntry,
 } from '../src/index.js';
 const { Client, Issuer, TokenRequest, TokenResponse, verifyToken, BlindRSAMode } = publicVerif;
 
@@ -78,6 +79,8 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
 
         const tokReqSer = tokReq.serialize();
         expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
+        expect(tokenRequestToTokenTypeEntry(tokReqSer)).toBe(TOKEN_TYPES.BLIND_RSA);
+
         const issuer = new Issuer(mode, 'issuer.example.com', privateKey, publicKey, ...params);
         const tokRes = await issuer.issue(tokReq);
         testSerialize(TokenResponse, tokRes);

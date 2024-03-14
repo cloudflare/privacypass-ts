@@ -10,6 +10,7 @@ import {
     Token,
     AuthorizationHeader,
     privateVerif,
+    tokenRequestToTokenTypeEntry,
 } from '../src/index.js';
 const { Client, Issuer, TokenRequest, TokenResponse, VOPRF } = privateVerif;
 
@@ -40,6 +41,7 @@ test.each(vectors)('PrivateVerifiable-Vector-%#', async (v: Vectors) => {
 
     const tokReqSer = tokReq.serialize();
     expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
+    expect(tokenRequestToTokenTypeEntry(tokReqSer)).toBe(TOKEN_TYPES.VOPRF);
 
     const issuer = new Issuer('issuer.example.com', privateKey, publicKey);
     const tokRes = await issuer.issue(tokReq);
