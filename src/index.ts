@@ -2,7 +2,7 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { base64url } from 'rfc4648';
-import { WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { WWWAuthenticateHeader, type TokenTypeEntry } from './auth_scheme/private_token.js';
 import { Client as PublicVerifClient, BLIND_RSA, BlindRSAMode } from './pub_verif_token.js';
 import { Client as PrivateVerifClient, VOPRF } from './priv_verif_token.js';
 import { fetchToken, type PrivacyPassClient } from './issuance.js';
@@ -74,4 +74,18 @@ export async function header_to_token(header: string): Promise<string | null> {
     const authHeader = await fetchToken(client, pt);
     const encodedToken = base64url.stringify(te.encode(authHeader.toString()));
     return encodedToken;
+}
+
+export function tokenRequestToTokenTypeEntry(bytes: Uint8Array): TokenTypeEntry {
+    // All token requests have a 2-byte value at the beginning of the token describing TokenTypeEntry.
+    const input = new DataView(bytes.buffer);
+
+    const type = input.getUint16(0);
+    const tokenType = Object.values(TOKEN_TYPES).find((t) => t.value === type);
+
+    if (tokenType === undefined) {
+        throw new Error(`unrecognized or non-supported token type: ${type}`);
+    }
+
+    return tokenType;
 }
