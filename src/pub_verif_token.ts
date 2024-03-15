@@ -1,11 +1,18 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { type BlindRSA, type BlindRSAPlatformParams, RSABSSA } from '@cloudflare/blindrsa-ts';
+import {
+    type BlindRSA,
+    type PartiallyBlindRSA,
+    type BlindRSAPlatformParams,
+    RSABSSA,
+    RSAPBSSA,
+} from '@cloudflare/blindrsa-ts';
 
 import { convertRSASSAPSSToEnc, joinAll } from './util.js';
 import {
     AuthenticatorInput,
+    Extensions,
     Token,
     TokenChallenge,
     type TokenTypeEntry,
@@ -16,8 +23,16 @@ export enum BlindRSAMode {
     PSS = 48, // Corresponds to RSASSA.SHA384.PSS.Deterministic
 }
 
+export import PartiallyBlindRSAMode = BlindRSAMode;
+import type { PartiallyBlindRSAPlatformParams } from '@cloudflare/blindrsa-ts/lib/src/partially_blindrsa.js';
+
 export interface BlindRSAExtraParams {
     suite: Record<BlindRSAMode, (params?: BlindRSAPlatformParams) => BlindRSA>;
+    rsaParams: RsaHashedImportParams;
+}
+
+export interface PartiallyBlindRSAExtraParams {
+    suite: Record<PartiallyBlindRSAMode, (params?: BlindRSAPlatformParams) => PartiallyBlindRSA>;
     rsaParams: RsaHashedImportParams;
 }
 
@@ -32,10 +47,23 @@ const BLINDRSA_EXTRA_PARAMS: BlindRSAExtraParams = {
     },
 } as const;
 
+const PARTIALLY_BLINDRSA_EXTRA_PARAMS: PartiallyBlindRSAExtraParams = {
+    suite: {
+        [PartiallyBlindRSAMode.PSSZero]: RSAPBSSA.SHA384.PSSZero.Deterministic,
+        [PartiallyBlindRSAMode.PSS]: RSAPBSSA.SHA384.PSS.Deterministic,
+    },
+    rsaParams: {
+        name: 'RSA-PSS',
+        hash: 'SHA-384',
+    },
+} as const;
+
 // Token Type Entry Update:
 //  - Token Type Blind RSA (2048-bit)
+//  - Token Type Partially Blind RSA (2048-bit)
 //
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-blind-rsa-2048-b',
+// https://datatracker.ietf.org/doc/html/draft-hendrickson-privacypass-public-metadata-03#section-8.2
 export const BLIND_RSA: Readonly<TokenTypeEntry> & BlindRSAExtraParams = {
     value: 0x0002,
     name: 'Blind RSA (2048)',
@@ -46,14 +74,19 @@ export const BLIND_RSA: Readonly<TokenTypeEntry> & BlindRSAExtraParams = {
     privateMetadata: false,
     ...BLINDRSA_EXTRA_PARAMS,
 } as const;
+type BlindRSAType = typeof BLIND_RSA;
 
-export function keyGen(
-    mode: BlindRSAMode,
-    algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
-): Promise<CryptoKeyPair> {
-    const suite = BLIND_RSA.suite[mode as BlindRSAMode]();
-    return suite.generateKey(algorithm);
-}
+export const PARTIALLY_BLIND_RSA: Readonly<TokenTypeEntry> & PartiallyBlindRSAExtraParams = {
+    value: 0xda7a,
+    name: 'Partially Blind RSA (2048-bit)',
+    Nk: 256,
+    Nid: 32,
+    publicVerifiable: true,
+    publicMetadata: true,
+    privateMetadata: false,
+    ...PARTIALLY_BLINDRSA_EXTRA_PARAMS,
+} as const;
+type PartiallyBlindRSAType = typeof PARTIALLY_BLIND_RSA;
 
 function getCryptoKey(publicKey: Uint8Array): Promise<CryptoKey> {
     // Converts a RSA-PSS key into a RSA Encryption key.
@@ -74,7 +107,7 @@ async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
 
 export class TokenRequest {
     // struct {
-    //     uint16_t token_type = 0x0002; /* Type Blind RSA (2048-bit) */
+    //     uint16_t token_type = 0x0002 | 0xda7a; /* Type Blind RSA (2048-bit) */
     //     uint8_t truncated_token_key_id;
     //     uint8_t blinded_msg[Nk];
     // } TokenRequest;
@@ -83,33 +116,34 @@ export class TokenRequest {
     constructor(
         public readonly truncatedTokenKeyId: number,
         public readonly blindedMsg: Uint8Array,
+        tokenType: TokenTypeEntry,
     ) {
-        if (blindedMsg.length !== BLIND_RSA.Nk) {
+        if (blindedMsg.length !== tokenType.Nk) {
             throw new Error('invalid blinded message size');
         }
 
-        this.tokenType = BLIND_RSA.value;
+        this.tokenType = tokenType.value;
     }
 
-    static deserialize(bytes: Uint8Array): TokenRequest {
+    static deserialize(tokenType: TokenTypeEntry, bytes: Uint8Array): TokenRequest {
         let offset = 0;
         const input = new DataView(bytes.buffer);
 
         const type = input.getUint16(offset);
         offset += 2;
 
-        if (type !== BLIND_RSA.value) {
+        if (type !== tokenType.value) {
             throw new Error('mismatch of token type');
         }
 
         const tokenKeyId = input.getUint8(offset);
         offset += 1;
 
-        const len = BLIND_RSA.Nk;
+        const len = tokenType.Nk;
         const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
         offset += len;
 
-        return new TokenRequest(tokenKeyId, blindedMsg);
+        return new TokenRequest(tokenKeyId, blindedMsg, tokenType);
     }
 
     serialize(): Uint8Array {
@@ -125,6 +159,36 @@ export class TokenRequest {
 
         b = this.blindedMsg.buffer;
         output.push(b);
+
+        return new Uint8Array(joinAll(output));
+    }
+}
+
+export class ExtendedTokenRequest {
+    // struct {
+    //     TokenRequest request;
+    //     Extensions extensions;
+    // } ExtendedTokenRequest;
+
+    constructor(
+        public readonly request: TokenRequest,
+        public readonly extensions: Extensions,
+    ) {}
+
+    static deserialize(bytes: Uint8Array): ExtendedTokenRequest {
+        const request = TokenRequest.deserialize(PARTIALLY_BLIND_RSA, bytes);
+        const extensions = Extensions.deserialize(bytes.slice(3 + PARTIALLY_BLIND_RSA.Nk));
+        return new ExtendedTokenRequest(request, extensions);
+    }
+
+    serialize(): Uint8Array {
+        const output = new Array<ArrayBuffer>();
+
+        const request = this.request.serialize();
+        output.push(request.buffer);
+
+        const extensions = this.extensions.serialize();
+        output.push(extensions.buffer);
 
         return new Uint8Array(joinAll(output));
     }
@@ -150,43 +214,96 @@ export class TokenResponse {
     }
 }
 
-export function verifyToken(
-    blindRSAMode: BlindRSAMode,
-    token: Token,
-    publicKeyIssuer: CryptoKey,
-): Promise<boolean> {
-    return crypto.subtle.verify(
-        {
-            ...BLIND_RSA.rsaParams,
-            saltLength: blindRSAMode,
-        },
-        publicKeyIssuer,
-        token.authenticator,
-        token.authInput.serialize(),
-    );
-}
+abstract class PubliclyVerifiableIssuer {
+    private suite: (extensions?: Extensions) => Pick<BlindRSA, 'blindSign' | 'verify'>;
 
-export class Issuer {
     constructor(
-        public readonly mode: BlindRSAMode,
+        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
         public readonly name: string,
         private readonly privateKey: CryptoKey,
         public readonly publicKey: CryptoKey,
-        public readonly params?: BlindRSAPlatformParams,
-    ) {}
+        public readonly params?: BlindRSAPlatformParams | PartiallyBlindRSAPlatformParams,
+    ) {
+        this.suite = (extensions?: Extensions) => {
+            if (extensions === undefined) {
+                return BLIND_RSA.suite[this.mode]();
+            } else {
+                const suite = PARTIALLY_BLIND_RSA.suite[this.mode]();
+                const serializedExtensions = extensions.serialize();
+                return {
+                    blindSign: (privateKey: CryptoKey, blindMsg: Uint8Array) =>
+                        suite.blindSign(privateKey, blindMsg, serializedExtensions),
+                    verify: (publicKey: CryptoKey, signature: Uint8Array, message: Uint8Array) =>
+                        suite.verify(publicKey, signature, message, serializedExtensions),
+                };
+            }
+        };
+    }
 
-    async issue(tokReq: TokenRequest): Promise<TokenResponse> {
-        const suite = BLIND_RSA.suite[this.mode](this.params);
-        const blindSig = await suite.blindSign(this.privateKey, tokReq.blindedMsg);
+    protected async _issue(tokReq: TokenRequest, extensions?: Extensions): Promise<TokenResponse> {
+        const blindSig = await this.suite(extensions).blindSign(this.privateKey, tokReq.blindedMsg);
         return new TokenResponse(blindSig);
     }
 
     verify(token: Token): Promise<boolean> {
-        return verifyToken(this.mode, token, this.publicKey);
+        return this.suite().verify(
+            this.publicKey,
+            token.authenticator,
+            token.authInput.serialize(),
+        );
     }
 }
 
-export class Client {
+export class Issuer extends PubliclyVerifiableIssuer {
+    constructor(
+        mode: BlindRSAMode,
+        name: string,
+        privateKey: CryptoKey,
+        publicKey: CryptoKey,
+        params?: BlindRSAPlatformParams,
+    ) {
+        super(mode, name, privateKey, publicKey, params);
+    }
+
+    async issue(tokReq: TokenRequest): Promise<TokenResponse> {
+        return super._issue(tokReq);
+    }
+
+    static generateKey(
+        mode: BlindRSAMode,
+        algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
+    ): Promise<CryptoKeyPair> {
+        const suite = BLIND_RSA.suite[mode as BlindRSAMode]();
+        return suite.generateKey(algorithm);
+    }
+}
+
+export class IssuerWithMetadata extends PubliclyVerifiableIssuer {
+    constructor(
+        mode: PartiallyBlindRSAMode,
+        name: string,
+        privateKey: CryptoKey,
+        publicKey: CryptoKey,
+        params?: PartiallyBlindRSAPlatformParams,
+    ) {
+        super(mode, name, privateKey, publicKey, params);
+    }
+
+    async issue(tokReq: ExtendedTokenRequest): Promise<TokenResponse> {
+        return super._issue(tokReq.request, tokReq.extensions);
+    }
+
+    static generateKey(
+        mode: PartiallyBlindRSAMode,
+        algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
+        generateSafePrimeSync?: (length: number) => bigint,
+    ): Promise<CryptoKeyPair> {
+        const suite = PARTIALLY_BLIND_RSA.suite[mode as PartiallyBlindRSAMode]();
+        return suite.generateKey(algorithm, generateSafePrimeSync);
+    }
+}
+
+abstract class PubliclyVerifiableClient {
     private finData?: {
         pkIssuer: CryptoKey;
         tokenInput: Uint8Array;
@@ -194,13 +311,35 @@ export class Client {
         inv: Uint8Array;
     };
 
-    private suite: BlindRSA;
+    // given extensions are known when the constructor is called, extensions can be abstracted to provide the same signature as BlindRSA
+    private suite: Pick<BlindRSA, 'blind' | 'finalize'>;
+    private tokenType: BlindRSAType | PartiallyBlindRSAType;
 
-    constructor(public readonly mode: BlindRSAMode) {
-        this.suite = BLIND_RSA.suite[this.mode]();
+    constructor(
+        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
+        public readonly extensions?: Extensions,
+    ) {
+        if (this.extensions === undefined) {
+            this.tokenType = BLIND_RSA;
+            this.suite = BLIND_RSA.suite[this.mode]();
+        } else {
+            this.tokenType = PARTIALLY_BLIND_RSA;
+            const suite = PARTIALLY_BLIND_RSA.suite[this.mode]();
+            const extensions = this.extensions.serialize();
+            this.suite = {
+                blind: (publicKey: CryptoKey, msg: Uint8Array) =>
+                    suite.blind(publicKey, msg, extensions),
+                finalize: (
+                    publicKey: CryptoKey,
+                    msg: Uint8Array,
+                    blindSig: Uint8Array,
+                    inv: Uint8Array,
+                ) => suite.finalize(publicKey, msg, extensions, blindSig, inv),
+            };
+        }
     }
 
-    async createTokenRequest(
+    protected async _createTokenRequest(
         tokChl: TokenChallenge,
         issuerPublicKey: Uint8Array,
     ): Promise<TokenRequest> {
@@ -211,8 +350,8 @@ export class Client {
 
         const tokenKeyId = await getTokenKeyID(issuerPublicKey);
         const authInput = new AuthenticatorInput(
-            BLIND_RSA,
-            BLIND_RSA.value,
+            this.tokenType,
+            this.tokenType.value,
             nonce,
             challengeDigest,
             tokenKeyId,
@@ -225,7 +364,7 @@ export class Client {
         // token_key_id in network byte order (in other words, the
         // last 8 bits of token_key_id).
         const truncatedTokenKeyId = tokenKeyId[tokenKeyId.length - 1];
-        const tokenRequest = new TokenRequest(truncatedTokenKeyId, blindedMsg);
+        const tokenRequest = new TokenRequest(truncatedTokenKeyId, blindedMsg, this.tokenType);
 
         this.finData = { tokenInput, authInput, inv, pkIssuer };
 
@@ -247,10 +386,86 @@ export class Client {
             tokRes.blindSig,
             this.finData.inv,
         );
-        const token = new Token(BLIND_RSA, this.finData.authInput, authenticator);
+        const token = new Token(this.tokenType, this.finData.authInput, authenticator);
 
         this.finData = undefined;
 
         return token;
+    }
+}
+
+export class Client extends PubliclyVerifiableClient {
+    constructor(mode: BlindRSAMode) {
+        super(mode);
+    }
+
+    async createTokenRequest(
+        tokChl: TokenChallenge,
+        issuerPublicKey: Uint8Array,
+    ): Promise<TokenRequest> {
+        return super._createTokenRequest(tokChl, issuerPublicKey);
+    }
+}
+
+export class ClientWithMetadata extends PubliclyVerifiableClient {
+    constructor(mode: PartiallyBlindRSAMode, extensions: Extensions) {
+        super(mode, extensions);
+    }
+
+    async createTokenRequest(
+        tokChl: TokenChallenge,
+        issuerPublicKey: Uint8Array,
+    ): Promise<ExtendedTokenRequest> {
+        const tokenRequest = await super._createTokenRequest(tokChl, issuerPublicKey);
+        return new ExtendedTokenRequest(tokenRequest, this.extensions!);
+    }
+}
+
+abstract class PubliclyVerifiableOrigin {
+    private tokenType: BlindRSAType | PartiallyBlindRSAType;
+    private suite: Pick<BlindRSA, 'verify'>;
+
+    constructor(
+        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
+        public readonly originInfo?: string[],
+        public readonly extensions?: Extensions,
+    ) {
+        if (this.extensions === undefined) {
+            this.suite = BLIND_RSA.suite[this.mode]();
+            this.tokenType = BLIND_RSA;
+        } else {
+            const suite = PARTIALLY_BLIND_RSA.suite[this.mode]();
+            const extensions = this.extensions.serialize();
+            this.suite = {
+                verify: (publicKey: CryptoKey, signature: Uint8Array, message: Uint8Array) =>
+                    suite.verify(publicKey, signature, message, extensions),
+            };
+            this.tokenType = PARTIALLY_BLIND_RSA;
+        }
+    }
+
+    async verify(token: Token, publicKeyIssuer: CryptoKey): Promise<boolean> {
+        return this.suite.verify(publicKeyIssuer, token.authenticator, token.authInput.serialize());
+    }
+
+    createTokenChallenge(issuerName: string, redemptionContext: Uint8Array): TokenChallenge {
+        return new TokenChallenge(
+            this.tokenType.value,
+            issuerName,
+            redemptionContext,
+            this.originInfo,
+        );
+    }
+}
+
+export class Origin extends PubliclyVerifiableOrigin {
+    constructor(mode: BlindRSAMode, originInfo?: string[]) {
+        super(mode, originInfo);
+    }
+}
+
+export class OriginWithMetadata extends PubliclyVerifiableOrigin {
+    constructor(mode: PartiallyBlindRSAMode, extensions: Extensions, originInfo?: string[]) {
+        super(mode, originInfo, extensions);
     }
 }
