@@ -18,12 +18,6 @@ type TokenVectors = (typeof tokenVectors)[number];
 
 const MAX_UINT16 = (1 << 16) - 1;
 
-function u8AreEqual(a: Uint8Array, b: Uint8Array): boolean {
-    if (a.byteLength !== b.byteLength) return false;
-    // eslint-disable-next-line security/detect-object-injection
-    return a.every((val, i) => val === b[i]);
-}
-
 describe('PublicVerifiableMetadata failing edge case', () => {
     test('Invalid extension number', () => {
         function invalidExtensionConstructor() {
@@ -58,7 +52,7 @@ describe('PublicVerifiableMetadata failing edge case', () => {
         }
         const extensions = extensionsConstructor();
         const serialized = extensions.serialize();
-        expect(u8AreEqual(serialized, new Uint8Array([0, 8, 0, 1, 0, 0, 0, 2, 0, 0]))).toBe(true);
+        expect(serialized).toStrictEqual(new Uint8Array([0, 8, 0, 1, 0, 0, 0, 2, 0, 0]));
     });
 
     test('Repeated extension type', () => {
@@ -70,7 +64,7 @@ describe('PublicVerifiableMetadata failing edge case', () => {
         }
         const extensions = extensionsConstructor();
         const serialized = extensions.serialize();
-        expect(u8AreEqual(serialized, new Uint8Array([0, 8, 0, 1, 0, 0, 0, 1, 0, 0]))).toBe(true);
+        expect(serialized).toStrictEqual(new Uint8Array([0, 8, 0, 1, 0, 0, 0, 1, 0, 0]));
     });
 
     test('Extensions 0 and MAX_UINT type', () => {
@@ -82,9 +76,7 @@ describe('PublicVerifiableMetadata failing edge case', () => {
         }
         const extensions = extensionsConstructor();
         const serialized = extensions.serialize();
-        expect(u8AreEqual(serialized, new Uint8Array([0, 8, 0, 0, 0, 0, 255, 255, 0, 0]))).toBe(
-            true,
-        );
+        expect(serialized).toStrictEqual(new Uint8Array([0, 8, 0, 0, 0, 0, 255, 255, 0, 0]));
     });
 
     test('Too many extensions', () => {
