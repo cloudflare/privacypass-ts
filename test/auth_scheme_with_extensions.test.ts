@@ -8,7 +8,13 @@ import {
     TOKEN_TYPES,
     TokenChallenge,
 } from '../src/index.js';
-import { hexToString, hexToUint8, testSerialize, uint8ToHex } from './util.js';
+import {
+    hexToString,
+    hexToUint8,
+    testSerialize,
+    testSerializeWithOps,
+    uint8ToHex,
+} from './util.js';
 
 // Test vectors adapted from Privacy Pass Auth Scheme Draft 14
 // The draft for extensions only defines Authorization header, not WWW-Authenticate
@@ -78,15 +84,6 @@ describe('PublicVerifiableMetadata failing edge case', () => {
         const serialized = extensions.serialize();
         expect(serialized).toStrictEqual(new Uint8Array([0, 8, 0, 0, 0, 0, 255, 255, 0, 0]));
     });
-
-    test('Too many extensions', () => {
-        function invalidExtensionsConstructor() {
-            return new Extensions(
-                new Array(MAX_UINT16 + 1).fill(new Extension(1, new Uint8Array(0))),
-            );
-        }
-        expect(invalidExtensionsConstructor).toThrow();
-    });
 });
 
 test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => {
@@ -115,4 +112,50 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
     const authInputEnc = authInput.serialize();
 
     expect(uint8ToHex(authInputEnc)).toBe(v.token_authenticator_input);
+});
+
+describe('extensions', () => {
+    test('maxSizeExtension', () => {
+        const ext = new Extension(0xaa, new Uint8Array(MAX_UINT16));
+        testSerializeWithOps(Extension, ext);
+
+        const extBytes = ext.serialize();
+        expect(extBytes.length).toBe(2 + 2 + MAX_UINT16);
+    });
+
+    test('maxSizeArrayExtension', () => {
+        const ext = new Extension(0xaa, new Uint8Array(MAX_UINT16));
+        const arrayExt = new Extensions([ext]);
+
+        testSerialize(Extensions, arrayExt);
+
+        const arrayExtBytes = arrayExt.serialize();
+        expect(arrayExtBytes.length).toBe(
+            2 /* <-- This prefix should be at least 4 bytes. */ + (2 + 2 + MAX_UINT16),
+        );
+    });
+
+    test('serialize', () => {
+        const arrayExt = new Extensions([
+            new Extension(0xa1, new Uint8Array([0x11, 0x22, 0x33])),
+            new Extension(0xa2, new Uint8Array([0x55, 0x66])),
+            new Extension(0xa3, new Uint8Array([0x88])),
+        ]);
+
+        testSerialize(Extensions, arrayExt);
+
+        const expectedBytes = Uint8Array.from([
+            // Total length of the next bytes
+            0x00, 0x12,
+            // first extension
+            0x00, 0xa1, 0x00, 0x03, 0x11, 0x22, 0x33,
+            // second extension
+            0x00, 0xa2, 0x00, 0x02, 0x55, 0x66,
+            // third extension
+            0x00, 0xa3, 0x00, 0x01, 0x88,
+        ]);
+
+        const bytes = arrayExt.serialize();
+        expect(bytes).toStrictEqual(expectedBytes);
+    });
 });

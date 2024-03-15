@@ -317,14 +317,15 @@ export class Extension {
 
     static deserialize(bytes: Uint8Array, ops: { bytesRead: number }): Extension {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
 
         const type = input.getUint16(offset);
         offset += 2;
 
         const len = input.getUint16(offset);
         offset += 2;
-        const extensionData = new Uint8Array(input.buffer.slice(offset, offset + len));
+
+        const extensionData = bytes.slice(offset, offset + len);
         offset += len;
 
         ops.bytesRead = offset;
@@ -359,9 +360,6 @@ export class Extensions {
     // } Extensions;
 
     constructor(public extensions: Extension[]) {
-        if (extensions.length > MAX_UINT16) {
-            throw new Error('invalid number of extensions. MUST be less or equal to 2^16-1.');
-        }
         let lastExtensionType = -1;
         for (const extension of extensions) {
             if (extension.extensionType < lastExtensionType) {
@@ -373,20 +371,24 @@ export class Extensions {
 
     static deserialize(bytes: Uint8Array): Extensions {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
-        const extensionsLengthInBytes = input.getUint16(offset);
+        const lenNext = input.getUint16(offset);
         offset += 2;
 
-        if (extensionsLengthInBytes + offset !== bytes.length) {
-            throw new Error('invalid extensions length');
+        const nextBytes = bytes.subarray(offset, offset + lenNext);
+
+        let bytesRead = 0;
+        const extensions = new Array<Extension>();
+        while (bytesRead < lenNext) {
+            const ops = { bytesRead: 0 };
+            const ext = Extension.deserialize(nextBytes.subarray(bytesRead), ops);
+            extensions.push(ext);
+            bytesRead += ops.bytesRead;
         }
 
-        const extensions = new Array<Extension>();
-        while (offset < extensionsLengthInBytes) {
-            const ops = { bytesRead: offset };
-            extensions.push(Extension.deserialize(new Uint8Array(input.buffer.slice(offset)), ops));
-            offset += ops.bytesRead;
+        if (bytesRead < lenNext) {
+            throw new Error(`there are ${lenNext - bytesRead} remaining bytes unread`);
         }
 
         return new Extensions(extensions);
@@ -400,6 +402,16 @@ export class Extensions {
             const serialized = extension.serialize();
             length += serialized.length;
             output.push(serialized);
+        }
+
+        if (length > MAX_UINT16) {
+            // I consider this is an error in the specification
+            // it should be from 0 to 2^32-1
+            //
+            // struct {
+            //     Extension extensions<0..2^32-1>;
+            // } Extensions;
+            throw new Error('Extensions length MUST be less or equal to 2^16-1.');
         }
 
         const lengthEnc = new ArrayBuffer(2);

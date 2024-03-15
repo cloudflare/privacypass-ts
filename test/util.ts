@@ -29,6 +29,21 @@ export function testSerialize(classType: CanDeserialize<CanSerialize>, instance:
     expect(got).toStrictEqual(instance);
 }
 
+interface CanDeserializeWithOps<T extends CanSerialize> {
+    deserialize(_b: Uint8Array, ops: { bytesRead: number }): T;
+}
+
+export function testSerializeWithOps(
+    classType: CanDeserializeWithOps<CanSerialize>,
+    instance: CanSerialize,
+) {
+    const bytes = instance.serialize();
+    const ops = { bytesRead: 0 };
+    const got = classType.deserialize(bytes, ops);
+    expect(got).toStrictEqual(instance);
+    expect(ops.bytesRead).toBe(bytes.length);
+}
+
 interface CanDeserializeWithType<T extends CanSerialize> {
     deserialize(type: TokenTypeEntry, _b: Uint8Array): T;
 }
