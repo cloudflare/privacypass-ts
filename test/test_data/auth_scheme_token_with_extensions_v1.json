@@ -1,0 +1,52 @@
+[
+    {
+        "comment": "//   token_type(da7a), issuer_name(issuer.example),\n//   origin_info(origin.example), redemption_context(non-empty), extensions(extension(0x0000, uint8[01, 02, 03]))",
+        "token_type": "0xda7a",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "6f726967696e2e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "da7ae01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688ababd95573d45e84e65d5ce4adaff401040b823a5586c30855580bff3ea0118f8192ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(da7a), issuer_name(issuer.example),\n//   origin_info(origin.example), redemption_context(empty), extensions(extension(0x0000, uint8[01, 02, 03]))",
+        "token_type": "0xda7a",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "",
+        "origin_info": "6f726967696e2e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "da7ae01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab0021e3fccff3e175dabdef586fafdbb26fc0a869ee29d0229b592729fa6b1289ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(da7a), issuer_name(issuer.example),\n//   origin_info(), redemption_context(empty), extensions(extension(0x0000, uint8[01, 02, 03]))",
+        "token_type": "0xda7a",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "",
+        "origin_info": "",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "da7ae01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688ababe67c893c237722726064008792670a0368dbe8fcfd47c8233613bee3e1ee52ffca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(000da7a2), issuer_name(issuer.example),\n//   origin_info(), redemption_context(non-empty), extensions(extension(0x0000, uint8[01, 02, 03]))",
+        "token_type": "0xda7a",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "da7ae01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab69a780715896548c5eecaee2be452eac6bb001078a057993f665c653133b7ffcca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    },
+    {
+        "comment": "//   token_type(da7a), issuer_name(issuer.example),\n//   origin_info(foo.example,bar.example),\n//   redemption_context(non-empty), extensions(extension(0x0000, uint8[01, 02, 03]))",
+        "token_type": "0xda7a",
+        "issuer_name": "6973737565722e6578616d706c65",
+        "redemption_context": "476ac2c935f458e9b2d7af32dacfbd22dd6023ef5887a789f1abe004e79bb5bb",
+        "origin_info": "666f6f2e6578616d706c652c6261722e6578616d706c65",
+        "nonce": "e01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab",
+        "token_key_id": "ca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708",
+        "token_authenticator_input": "da7ae01978182c469e5e026d66558ee186568614f235e41ef7e2378e6f202688abab6d3d849f2508b23721cedafbbff8183c1d7f2ed2c586f3641b8131f5ed719ebfca572f8982a9ca248a3056186322d93ca147266121ddeb5632c07f1f71cd2708"
+    }
+]
