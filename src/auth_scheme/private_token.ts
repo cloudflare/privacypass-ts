@@ -298,8 +298,10 @@ export class Extension {
     //
     // struct {
     //     ExtensionType extension_type;
-    //     opaque extension_data<0..2^16-1>;
+    //     opaque extension_data<0..2^16-4-1>;
     // } Extension;
+
+    static MAX_EXTENSION_DATA_LENGTH = MAX_UINT16 - 4;
 
     constructor(
         public extensionType: ExtensionType,
@@ -310,8 +312,8 @@ export class Extension {
                 'invalid value for extension type, MUST be an integer between 0 and 2^16-1',
             );
         }
-        if (extensionData.length > MAX_UINT16) {
-            throw new Error('invalid extension data size. Max size is 2^16-1.');
+        if (extensionData.length > Extension.MAX_EXTENSION_DATA_LENGTH) {
+            throw new Error('invalid extension data size. Max size is 2^16-4-1.');
         }
     }
 

@@ -116,22 +116,23 @@ test.each(tokenVectors)('AuthScheme-TokenVector-%#', async (v: TokenVectors) => 
 
 describe('extensions', () => {
     test('maxSizeExtension', () => {
-        const ext = new Extension(0xaa, new Uint8Array(MAX_UINT16));
+        const ext = new Extension(0xaa, new Uint8Array(Extension.MAX_EXTENSION_DATA_LENGTH));
         testSerializeWithOps(Extension, ext);
 
         const extBytes = ext.serialize();
-        expect(extBytes.length).toBe(2 + 2 + MAX_UINT16);
+        expect(extBytes.length).toBe(2 + 2 + Extension.MAX_EXTENSION_DATA_LENGTH);
     });
 
     test('maxSizeArrayExtension', () => {
-        const ext = new Extension(0xaa, new Uint8Array(MAX_UINT16));
+        const ext = new Extension(0xaa, new Uint8Array(Extension.MAX_EXTENSION_DATA_LENGTH));
         const arrayExt = new Extensions([ext]);
 
         testSerialize(Extensions, arrayExt);
 
         const arrayExtBytes = arrayExt.serialize();
         expect(arrayExtBytes.length).toBe(
-            2 /* <-- This prefix should be at least 4 bytes. */ + (2 + 2 + MAX_UINT16),
+            2 /* <-- This prefix should be at least 4 bytes. */ +
+                (2 + 2 + Extension.MAX_EXTENSION_DATA_LENGTH),
         );
     });
 
