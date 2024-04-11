@@ -3,7 +3,12 @@
 
 import { base64url } from 'rfc4648';
 import { WWWAuthenticateHeader, type TokenTypeEntry } from './auth_scheme/private_token.js';
-import { Client as PublicVerifClient, BLIND_RSA, BlindRSAMode } from './pub_verif_token.js';
+import {
+    Client as PublicVerifClient,
+    BLIND_RSA,
+    PARTIALLY_BLIND_RSA,
+    BlindRSAMode,
+} from './pub_verif_token.js';
 import { Client as PrivateVerifClient, VOPRF } from './priv_verif_token.js';
 import { fetchToken, type PrivacyPassClient } from './issuance.js';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
@@ -23,6 +28,8 @@ export * as publicVerif from './pub_verif_token.js';
 export const TOKEN_TYPES = {
     // Token Type Blind RSA (2048-bit)
     BLIND_RSA,
+    // Token Type Partially Blind RSA (2048-bit)
+    PARTIALLY_BLIND_RSA,
     // Token Type VOPRF (P-384, SHA-384)
     VOPRF,
 } as const;
