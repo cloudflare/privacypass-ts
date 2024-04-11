@@ -11,14 +11,21 @@ import {
     Token,
     AuthorizationHeader,
     publicVerif,
-    tokenRequestToTokenTypeEntry,
+    Extensions,
 } from '../src/index.js';
-const { Client, Issuer, Origin, TokenRequest, TokenResponse, BlindRSAMode } = publicVerif;
+const {
+    ClientWithMetadata,
+    ExtendedTokenRequest,
+    IssuerWithMetadata,
+    OriginWithMetadata,
+    TokenResponse,
+    PartiallyBlindRSAMode,
+} = publicVerif;
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
-import vectors from './test_data/pub_verif_v16.json';
+// Ad-hoc vectors, to be merged with the draft
+import vectors from './test_data/pub_verif_with_metadata_v3.json';
 
 type Vectors = (typeof vectors)[number];
 
@@ -52,20 +59,25 @@ async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> 
     return [{ privateKey, publicKey }, publicKeyEnc];
 }
 
-describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
+describe.each(vectors)('PublicVerifiableMetadata-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];
 
-    test.each(params)('PublicVerifiable-Vector-%#-Issuer-Params-%#', async (...params) => {
+    test.each(params)('PublicVerifiableMetadata-Vector-%#-Issuer-Params-%#', async (...params) => {
         const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
         expect(privateKey).toBeDefined();
         expect(publicKey).toBeDefined();
 
         const salt = hexToUint8(v.salt);
-        const mode = salt.length == BlindRSAMode.PSS ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
+        const mode =
+            salt.length == PartiallyBlindRSAMode.PSS
+                ? PartiallyBlindRSAMode.PSS
+                : PartiallyBlindRSAMode.PSSZero;
         const nonce = hexToUint8(v.nonce);
         const blind = hexToUint8(v.blind);
         const challengeSerialized = hexToUint8(v.token_challenge);
         const tokChl = TokenChallenge.deserialize(challengeSerialized);
+        const extensionsSerialized = hexToUint8(v.extensions);
+        const extensions = Extensions.deserialize(extensionsSerialized);
 
         // Mock for randomized operations.
         jest.spyOn(crypto, 'getRandomValues')
@@ -73,15 +85,19 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
             .mockReturnValueOnce(salt)
             .mockReturnValueOnce(blind);
 
-        const client = new Client(mode);
+        const client = new ClientWithMetadata(mode, extensions);
         const tokReq = await client.createTokenRequest(tokChl, publicKeyEnc);
-        testSerializeType(TOKEN_TYPES.BLIND_RSA, TokenRequest, tokReq);
+        testSerialize(ExtendedTokenRequest, tokReq);
 
         const tokReqSer = tokReq.serialize();
         expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
-        expect(tokenRequestToTokenTypeEntry(tokReqSer)).toBe(TOKEN_TYPES.BLIND_RSA);
-
-        const issuer = new Issuer(mode, 'issuer.example.com', privateKey, publicKey, ...params);
+        const issuer = new IssuerWithMetadata(
+            mode,
+            'issuer.example.com',
+            privateKey,
+            publicKey,
+            ...params,
+        );
         const tokRes = await issuer.issue(tokReq);
         testSerialize(TokenResponse, tokRes);
 
@@ -89,15 +105,17 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
         expect(uint8ToHex(tokResSer)).toBe(v.token_response);
 
         const token = await client.finalize(tokRes);
-        testSerializeType(TOKEN_TYPES.BLIND_RSA, Token, token);
+        testSerializeType(TOKEN_TYPES.PARTIALLY_BLIND_RSA, Token, token);
 
         const tokenSer = token.serialize();
         expect(uint8ToHex(tokenSer)).toBe(v.token);
 
-        expect(await new Origin(mode).verify(token, issuer.publicKey)).toBe(true);
+        expect(await new OriginWithMetadata(mode, extensions).verify(token, issuer.publicKey)).toBe(
+            true,
+        );
 
         const header = new AuthorizationHeader(token).toString();
-        const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, header);
+        const parsedTokens = AuthorizationHeader.parse(TOKEN_TYPES.PARTIALLY_BLIND_RSA, header);
         const parsedToken = parsedTokens[0];
         expect(parsedTokens).toHaveLength(1);
         expect(parsedToken.token.authInput.challengeDigest).toEqual(

@@ -29,6 +29,7 @@ import {
 } from './rfc9110.js';
 import { joinAll } from '../util.js';
 
+const MAX_UINT16 = (1 << 16) - 1;
 export const AUTH_SCHEME_NAME = 'PrivateToken';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-type-registry
@@ -285,6 +286,139 @@ export class Token {
     }
 }
 
+// enum {
+//     reserved(0),
+//     (65535)
+// } ExtensionType;
+export type ExtensionType = number;
+
+export class Extension {
+    // This class represents the following structure:
+    // See https://www.ietf.org/archive/id/draft-wood-privacypass-auth-scheme-extensions-01.html#section-3-2
+    //
+    // struct {
+    //     ExtensionType extension_type;
+    //     opaque extension_data<0..2^16-4-1>;
+    // } Extension;
+
+    static MAX_EXTENSION_DATA_LENGTH = MAX_UINT16 - 4;
+
+    constructor(
+        public extensionType: ExtensionType,
+        public extensionData: Uint8Array,
+    ) {
+        if (extensionType < 0 || extensionType > MAX_UINT16 || !Number.isInteger(extensionType)) {
+            throw new Error(
+                'invalid value for extension type, MUST be an integer between 0 and 2^16-1',
+            );
+        }
+        if (extensionData.length > Extension.MAX_EXTENSION_DATA_LENGTH) {
+            throw new Error('invalid extension data size. Max size is 2^16-4-1.');
+        }
+    }
+
+    static deserialize(bytes: Uint8Array, ops: { bytesRead: number }): Extension {
+        let offset = 0;
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+
+        const type = input.getUint16(offset);
+        offset += 2;
+
+        const len = input.getUint16(offset);
+        offset += 2;
+
+        const extensionData = bytes.slice(offset, offset + len);
+        offset += len;
+
+        ops.bytesRead = offset;
+
+        return new Extension(type, extensionData);
+    }
+
+    serialize(): Uint8Array {
+        const output = new Array<ArrayBuffer>();
+
+        let b = new ArrayBuffer(2);
+        new DataView(b).setUint16(0, this.extensionType);
+        output.push(b);
+
+        b = new ArrayBuffer(2);
+        new DataView(b).setUint16(0, this.extensionData.length);
+        output.push(b);
+
+        b = this.extensionData.buffer;
+        output.push(b);
+
+        return new Uint8Array(joinAll(output));
+    }
+}
+
+export class Extensions {
+    // This class represents the following structure:
+    // See https://www.ietf.org/archive/id/draft-wood-privacypass-auth-scheme-extensions-01.html#section-3-2
+    //
+    // struct {
+    //     Extension extensions<0..2^16-1>;
+    // } Extensions;
+    //
+    // Note that this structure cannot be serialized if the total length is over 2^16-1.
+
+    constructor(public extensions: Extension[]) {
+        let lastExtensionType = -1;
+        for (const extension of extensions) {
+            if (extension.extensionType < lastExtensionType) {
+                throw new Error('extensions must be sorted by extension type');
+            }
+            lastExtensionType = extension.extensionType;
+        }
+    }
+
+    static deserialize(bytes: Uint8Array): Extensions {
+        let offset = 0;
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+        const lenNext = input.getUint16(offset);
+        offset += 2;
+
+        const nextBytes = bytes.subarray(offset, offset + lenNext);
+
+        let bytesRead = 0;
+        const extensions = new Array<Extension>();
+        while (bytesRead < lenNext) {
+            const ops = { bytesRead: 0 };
+            const ext = Extension.deserialize(nextBytes.subarray(bytesRead), ops);
+            extensions.push(ext);
+            bytesRead += ops.bytesRead;
+        }
+
+        if (bytesRead < lenNext) {
+            throw new Error(`there are ${lenNext - bytesRead} remaining bytes unread`);
+        }
+
+        return new Extensions(extensions);
+    }
+
+    serialize(): Uint8Array {
+        const output = new Array<ArrayBuffer>();
+
+        let length = 0;
+        for (const extension of this.extensions) {
+            const serialized = extension.serialize();
+            length += serialized.length;
+            output.push(serialized);
+        }
+
+        if (length > MAX_UINT16) {
+            throw new Error('Extensions length MUST be less or equal to 2^16-1.');
+        }
+
+        const lengthEnc = new ArrayBuffer(2);
+        new DataView(lengthEnc).setUint16(0, length);
+
+        return new Uint8Array(joinAll([lengthEnc, ...output]));
+    }
+}
+
 // WWWAuthenticateHeader handles the parsing of the WWW-Authenticate header
 // under the PrivateToken scheme.
 //
@@ -388,17 +522,21 @@ export class WWWAuthenticateHeader {
 // AuthorizationHeader handles the parsing of the Authorization header
 // under the PrivateToken scheme.
 //
-// See https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-sending-tokens
+// See: https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-sending-tokens
+//      https://www.ietf.org/archive/id/draft-wood-privacypass-auth-scheme-extensions-01.html
 export class AuthorizationHeader {
-    constructor(public token: Token) {}
+    constructor(
+        public token: Token,
+        public extensions?: Extensions,
+    ) {}
 
     private static parseSingle(tokenTypeEntry: TokenTypeEntry, data: string): AuthorizationHeader {
         // Consumes data:
-        //   token="abc..."
+        //   token="abc...", extensions="def..."
 
         const attributes = data.split(',');
         let ppToken: Token | undefined = undefined;
-
+        let extentions: Extensions | undefined = undefined;
         for (const attr of attributes) {
             const idx = attr.indexOf('=');
             let attrKey = attr.substring(0, idx);
@@ -407,9 +545,19 @@ export class AuthorizationHeader {
             attrKey = attrKey.trim();
             attrValue = attrValue.trim();
 
-            if (attrKey === 'token') {
-                const tokenEnc = base64url.parse(attrValue);
-                ppToken = Token.deserialize(tokenTypeEntry, tokenEnc);
+            switch (attrKey) {
+                case 'token': {
+                    const tokenEnc = base64url.parse(attrValue);
+                    ppToken = Token.deserialize(tokenTypeEntry, tokenEnc);
+                    break;
+                }
+                case 'extensions': {
+                    if (tokenTypeEntry.publicMetadata) {
+                        const extEnc = base64url.parse(attrValue);
+                        extentions = Extensions.deserialize(extEnc);
+                    }
+                    break;
+                }
             }
         }
 
@@ -418,7 +566,7 @@ export class AuthorizationHeader {
             throw new Error('cannot parse token');
         }
 
-        return new AuthorizationHeader(ppToken);
+        return new AuthorizationHeader(ppToken, extentions);
     }
 
     private static parseInternal(
