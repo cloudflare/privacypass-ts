@@ -31,7 +31,7 @@ export interface VOPRFExtraParams {
 
 const VOPRF_SUITE = Oprf.Suite.P384_SHA384;
 const VOPRF_GROUP = Oprf.getGroup(VOPRF_SUITE);
-const VOPRF_HASH = Oprf.getHash(VOPRF_SUITE) as HashID;
+const VOPRF_HASH = Oprf.getHash(VOPRF_SUITE);
 const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
     suite: VOPRF_SUITE,
     group: VOPRF_GROUP,
@@ -40,10 +40,9 @@ const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
     Nk: Oprf.getOprfSize(VOPRF_SUITE),
     hash: VOPRF_HASH,
     dleqParams: {
-        gg: VOPRF_GROUP,
-        hashID: VOPRF_HASH,
-        hash: (hashID, input) => Oprf.Crypto.hash(hashID, input),
-        dst: '',
+        group: VOPRF_GROUP.id,
+        hash: VOPRF_HASH,
+        dst: new Uint8Array(),
     },
 } as const;
 
@@ -256,7 +255,7 @@ export class Client {
             throw new Error('no token request was created yet');
         }
 
-        const proof = DLEQProof.deserialize(VOPRF.dleqParams, tokRes.evaluateProof);
+        const proof = DLEQProof.deserialize(VOPRF_GROUP.id, tokRes.evaluateProof);
         const evaluateMsg = VOPRF.group.desElt(tokRes.evaluateMsg);
         const evaluation = new Evaluation(Oprf.Mode.VOPRF, [evaluateMsg], proof);
         const [authenticator] = await this.finData.vClient.finalize(
