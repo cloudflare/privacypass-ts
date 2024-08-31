@@ -20,8 +20,8 @@ export function convertRSASSAPSSToEnc(keyRSAPSSEncSpki: Uint8Array): Uint8Array 
         ],
     });
     const cmp = asn1js.verifySchema(keyRSAPSSEncSpki, schema);
-    if (cmp.verified != true) {
-        throw new Error('bad parsing');
+    if (!cmp.verified) {
+        throw new Error('bad parsing RSA-PSS key');
     }
 
     const keyASN = new asn1js.Sequence({
@@ -39,7 +39,7 @@ export function convertRSASSAPSSToEnc(keyRSAPSSEncSpki: Uint8Array): Uint8Array 
     return new Uint8Array(keyASN.toBER());
 }
 
-function algorithm() {
+function algorithm_RSASSA_PSS() {
     const RSAPSSAlgID = '1.2.840.113549.1.1.10';
     const publicKeyParams = new asn1js.Sequence({
         value: [
@@ -101,15 +101,21 @@ function algorithm() {
 //
 // Documentation: https://www.rfc-editor.org/rfc/rfc4055#section-6
 export function convertEncToRSASSAPSS(keyEncRSAPSSSpki: Uint8Array): Uint8Array {
-    const algorithmID = algorithm();
+    const schema = new asn1js.Sequence({
+        value: [
+            new asn1js.Sequence({ name: 'algorithm' }),
+            new asn1js.BitString({ name: 'subjectPublicKey' }),
+        ],
+    });
 
-    // I'm not sure how to access the spki directly as a BitString, therefore using any to access the Sequence value
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s2 = asn1js.fromBER(keyEncRSAPSSSpki).result as any;
-    const spki = s2.valueBlock.value[1];
+    const cmp = asn1js.verifySchema(keyEncRSAPSSSpki, schema);
+    if (!cmp.verified) {
+        throw new Error('bad parsing EncRSA key');
+    }
 
+    const algorithmID = algorithm_RSASSA_PSS();
     const asn = new asn1js.Sequence({
-        value: [algorithmID, spki],
+        value: [algorithmID, cmp.result.subjectPublicKey],
     });
 
     return new Uint8Array(asn.toBER());
