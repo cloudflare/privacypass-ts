@@ -75,7 +75,7 @@ async function rsaVariant(mode: PartiallyBlindRSAMode): Promise<void> {
 
     console.log('Public-Verifiable With Metadata tokens');
     console.log(
-        `    Suite: ${TOKEN_TYPES.PARTIALLY_BLIND_RSA.suite[mode as PartiallyBlindRSAMode]()}`,
+        `    Suite: ${TOKEN_TYPES.PARTIALLY_BLIND_RSA.suite[mode as unknown as PartiallyBlindRSAMode]()}`,
     );
     console.log(`    Valid token: ${isValid}`);
 }

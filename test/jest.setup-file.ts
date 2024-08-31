@@ -5,6 +5,7 @@
 import { RSABSSA } from '@cloudflare/blindrsa-ts';
 import { webcrypto } from 'node:crypto';
 
+// eslint-disable-next-line @typescript-eslint/unbound-method
 const parentSign = webcrypto.subtle.sign;
 
 // RSA-RAW is not supported by WebCrypto, so we need to mock it.
@@ -16,7 +17,7 @@ async function mockSign(
 ): Promise<ArrayBuffer> {
     if (
         algorithm === 'RSA-RAW' ||
-        (typeof algorithm !== 'string' && algorithm?.name === 'RSA-RAW')
+        (typeof algorithm !== 'string' && algorithm.name === 'RSA-RAW')
     ) {
         const algorithmName = key.algorithm.name;
         if (algorithmName !== 'RSA-RAW') {
@@ -24,7 +25,7 @@ async function mockSign(
         }
         key.algorithm.name = 'RSA-PSS';
         try {
-            return RSABSSA.SHA384.PSSZero.Deterministic().blindSign(key, data);
+            return await RSABSSA.SHA384.PSSZero.Deterministic().blindSign(key, data);
         } finally {
             key.algorithm.name = algorithmName;
         }

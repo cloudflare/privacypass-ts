@@ -218,7 +218,7 @@ abstract class PubliclyVerifiableIssuer {
     private suite: (extensions?: Extensions) => Pick<BlindRSA, 'blindSign' | 'verify'>;
 
     constructor(
-        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
+        public readonly mode: BlindRSAMode,
         public readonly name: string,
         private readonly privateKey: CryptoKey,
         public readonly publicKey: CryptoKey,
@@ -255,16 +255,6 @@ abstract class PubliclyVerifiableIssuer {
 }
 
 export class Issuer extends PubliclyVerifiableIssuer {
-    constructor(
-        mode: BlindRSAMode,
-        name: string,
-        privateKey: CryptoKey,
-        publicKey: CryptoKey,
-        params?: BlindRSAPlatformParams,
-    ) {
-        super(mode, name, privateKey, publicKey, params);
-    }
-
     async issue(tokReq: TokenRequest): Promise<TokenResponse> {
         return super._issue(tokReq);
     }
@@ -273,22 +263,12 @@ export class Issuer extends PubliclyVerifiableIssuer {
         mode: BlindRSAMode,
         algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
     ): Promise<CryptoKeyPair> {
-        const suite = BLIND_RSA.suite[mode as BlindRSAMode]();
+        const suite = BLIND_RSA.suite[mode as unknown as BlindRSAMode]();
         return suite.generateKey(algorithm);
     }
 }
 
 export class IssuerWithMetadata extends PubliclyVerifiableIssuer {
-    constructor(
-        mode: PartiallyBlindRSAMode,
-        name: string,
-        privateKey: CryptoKey,
-        publicKey: CryptoKey,
-        params?: PartiallyBlindRSAPlatformParams,
-    ) {
-        super(mode, name, privateKey, publicKey, params);
-    }
-
     async issue(tokReq: ExtendedTokenRequest): Promise<TokenResponse> {
         return super._issue(tokReq.request, tokReq.extensions);
     }
@@ -298,7 +278,7 @@ export class IssuerWithMetadata extends PubliclyVerifiableIssuer {
         algorithm: Pick<RsaHashedKeyGenParams, 'modulusLength' | 'publicExponent'>,
         generateSafePrimeSync?: (length: number) => bigint,
     ): Promise<CryptoKeyPair> {
-        const suite = PARTIALLY_BLIND_RSA.suite[mode as PartiallyBlindRSAMode]();
+        const suite = PARTIALLY_BLIND_RSA.suite[mode as unknown as PartiallyBlindRSAMode]();
         return suite.generateKey(algorithm, generateSafePrimeSync);
     }
 }
@@ -316,7 +296,7 @@ abstract class PubliclyVerifiableClient {
     private tokenType: BlindRSAType | PartiallyBlindRSAType;
 
     constructor(
-        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
+        public readonly mode: BlindRSAMode,
         public readonly extensions?: Extensions,
     ) {
         if (this.extensions === undefined) {
@@ -395,10 +375,6 @@ abstract class PubliclyVerifiableClient {
 }
 
 export class Client extends PubliclyVerifiableClient {
-    constructor(mode: BlindRSAMode) {
-        super(mode);
-    }
-
     async createTokenRequest(
         tokChl: TokenChallenge,
         issuerPublicKey: Uint8Array,
@@ -408,16 +384,15 @@ export class Client extends PubliclyVerifiableClient {
 }
 
 export class ClientWithMetadata extends PubliclyVerifiableClient {
-    constructor(mode: PartiallyBlindRSAMode, extensions: Extensions) {
-        super(mode, extensions);
-    }
-
     async createTokenRequest(
         tokChl: TokenChallenge,
         issuerPublicKey: Uint8Array,
     ): Promise<ExtendedTokenRequest> {
         const tokenRequest = await super._createTokenRequest(tokChl, issuerPublicKey);
-        return new ExtendedTokenRequest(tokenRequest, this.extensions!);
+        if (!this.extensions) {
+            throw new Error('no extensions available');
+        }
+        return new ExtendedTokenRequest(tokenRequest, this.extensions);
     }
 }
 
@@ -426,7 +401,7 @@ abstract class PubliclyVerifiableOrigin {
     private suite: Pick<BlindRSA, 'verify'>;
 
     constructor(
-        public readonly mode: BlindRSAMode | PartiallyBlindRSAMode,
+        public readonly mode: BlindRSAMode,
         public readonly originInfo?: string[],
         public readonly extensions?: Extensions,
     ) {
@@ -458,11 +433,7 @@ abstract class PubliclyVerifiableOrigin {
     }
 }
 
-export class Origin extends PubliclyVerifiableOrigin {
-    constructor(mode: BlindRSAMode, originInfo?: string[]) {
-        super(mode, originInfo);
-    }
-}
+export class Origin extends PubliclyVerifiableOrigin {}
 
 export class OriginWithMetadata extends PubliclyVerifiableOrigin {
     constructor(mode: PartiallyBlindRSAMode, extensions: Extensions, originInfo?: string[]) {

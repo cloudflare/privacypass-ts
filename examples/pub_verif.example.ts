@@ -53,7 +53,7 @@ async function rsaVariant(mode: BlindRSAMode): Promise<void> {
     const isValid = await origin.verify(token, issuer.publicKey);
 
     console.log('Public-Verifiable tokens');
-    console.log(`    Suite: ${TOKEN_TYPES.BLIND_RSA.suite[mode as BlindRSAMode]()}`);
+    console.log(`    Suite: ${TOKEN_TYPES.BLIND_RSA.suite[mode as unknown as BlindRSAMode]()}`);
     console.log(`    Valid token: ${isValid}`);
 }
 

@@ -33,19 +33,20 @@ function parseWWWAuthenticateInternal(header: string, includeNonCompliantToken: 
     // This means the regex is not built statically
     // This is an ok behaviour in this case, given the dynamic component is scoped
     // eslint-disable-next-line security/detect-non-literal-regexp
-    const challengesRegex = new RegExp(`${challenges}`, 'y');
+    const challengesRegex = new RegExp(challenges, 'y');
 
     let first = true;
     let everythingConsumed = false;
     const matches: string[] = [];
-    for (let m; (m = challengesRegex.exec(header)); ) {
+    let m;
+    while ((m = challengesRegex.exec(header))) {
         if (first) {
-            if (m?.groups?.skip) {
+            if (m.groups?.skip) {
                 break;
             }
             first = false;
         }
-        const data = m?.groups?.challenge;
+        const data = m.groups?.challenge;
         if (data) {
             matches.push(data);
         }

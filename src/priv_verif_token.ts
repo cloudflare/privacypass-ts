@@ -1,10 +1,10 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
+import type { FinalizeData } from '@cloudflare/voprf-ts';
 import {
     Evaluation,
     EvaluationRequest,
-    FinalizeData,
     Oprf,
     VOPRFClient,
     VOPRFServer,
@@ -15,14 +15,9 @@ import {
     type HashID,
     DLEQProof,
 } from '@cloudflare/voprf-ts';
-
+import type { TokenChallenge } from './auth_scheme/private_token.js';
+import { AuthenticatorInput, Token, type TokenTypeEntry } from './auth_scheme/private_token.js';
 import { joinAll } from './util.js';
-import {
-    AuthenticatorInput,
-    Token,
-    TokenChallenge,
-    type TokenTypeEntry,
-} from './auth_scheme/private_token.js';
 
 export interface VOPRFExtraParams {
     suite: SuiteID;
@@ -47,7 +42,7 @@ const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
     dleqParams: {
         gg: VOPRF_GROUP,
         hashID: VOPRF_HASH,
-        hash: Oprf.Crypto.hash,
+        hash: (hashID, input) => Oprf.Crypto.hash(hashID, input),
         dst: '',
     },
 } as const;
