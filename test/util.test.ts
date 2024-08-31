@@ -6,7 +6,7 @@ import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/util.js';
 describe('RSA-PSS', () => {
     it('should export a key', async () => {
         // generates a keyPair
-        const keyPair = (await crypto.subtle.generateKey(
+        const keyPair = await crypto.subtle.generateKey(
             {
                 name: 'RSA-PSS',
                 modulusLength: 2048,
@@ -15,14 +15,12 @@ describe('RSA-PSS', () => {
             },
             true,
             ['sign', 'verify'],
-        )) as CryptoKeyPair;
+        );
 
         // export the public key as RFC-5756 RSASSA-PSS, and import it again
-        const publicKey = new Uint8Array(
-            (await crypto.subtle.exportKey('spki', keyPair.publicKey)) as ArrayBuffer,
-        );
-        const publicKeyEnc = convertEncToRSASSAPSS(publicKey);
-        const spkiEncoded = convertRSASSAPSSToEnc(publicKeyEnc);
+        const publicKey = new Uint8Array(await crypto.subtle.exportKey('spki', keyPair.publicKey));
+        const publicKeyPSS = convertEncToRSASSAPSS(publicKey);
+        const spkiEncoded = convertRSASSAPSSToEnc(publicKeyPSS);
         const publicKeyIssuerPromise = crypto.subtle.importKey(
             'spki',
             spkiEncoded,
