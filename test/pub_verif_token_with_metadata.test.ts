@@ -69,7 +69,7 @@ describe.each(vectors)('PublicVerifiableMetadata-Vector-%#', (v: Vectors) => {
 
         const salt = hexToUint8(v.salt);
         const mode =
-            salt.length == PartiallyBlindRSAMode.PSS
+            salt.length == (PartiallyBlindRSAMode.PSS as number)
                 ? PartiallyBlindRSAMode.PSS
                 : PartiallyBlindRSAMode.PSSZero;
         const nonce = hexToUint8(v.nonce);

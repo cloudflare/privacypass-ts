@@ -17,8 +17,8 @@ async function examples() {
     await publicVerifiableWithMetadataTokens();
 }
 
-examples().catch((e: Error) => {
-    console.log(`Error: ${e.message}`);
-    console.log(`Stack: ${e.stack}`);
+examples().catch((e: unknown) => {
+    console.log(`Error: ${(e as Error).message}`);
+    console.log(`Stack: ${(e as Error).stack}`);
     process.exit(1);
 });

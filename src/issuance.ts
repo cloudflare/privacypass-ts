@@ -1,12 +1,8 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import {
-    AuthorizationHeader,
-    Token,
-    TokenChallenge,
-    WWWAuthenticateHeader,
-} from './auth_scheme/private_token.js';
+import type { Token, TokenChallenge, WWWAuthenticateHeader } from './auth_scheme/private_token.js';
+import { AuthorizationHeader } from './auth_scheme/private_token.js';
 import type { CanSerialize } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-well-known-private-token-is
@@ -45,13 +41,13 @@ export async function getIssuerUrl(issuerName: string): Promise<string> {
         throw new Error(`issuerConfig: no configuration was found at ${configURI}`);
     }
 
-    const response: IssuerConfig = await res.json();
+    const response: IssuerConfig = (await res.json()) as IssuerConfig;
     const uri = response['issuer-request-uri'];
     try {
         // assess is valid URL
         new URL(uri);
         return uri;
-    } catch (_) {
+    } catch {
         return `${baseURL}${uri}`;
     }
 }
@@ -62,7 +58,6 @@ export async function sendTokenRequest(
     issuerUrl: RequestInfo | URL,
     headers = new Headers(),
 ): Promise<Uint8Array> {
-    headers ??= new Headers();
     headers.append('Content-Type', MediaType.PRIVATE_TOKEN_REQUEST);
     headers.append('Accept', MediaType.PRIVATE_TOKEN_RESPONSE);
     const issuerResponse = await fetch(issuerUrl, {
@@ -78,7 +73,7 @@ export async function sendTokenRequest(
 
     const contentType = issuerResponse.headers.get('Content-Type');
 
-    if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE) {
+    if (!contentType || contentType.toLowerCase() !== MediaType.PRIVATE_TOKEN_RESPONSE.toString()) {
         throw new Error(
             `tokenRequest: response "Content-Type" header is not valid "${contentType}" is different from "${MediaType.PRIVATE_TOKEN_RESPONSE} header`,
         );
@@ -90,8 +85,8 @@ export async function sendTokenRequest(
     return tokResBytes;
 }
 
-export interface TokenReq extends CanSerialize {}
-export interface TokenRes extends CanSerialize {}
+export type TokenReq = CanSerialize;
+export type TokenRes = CanSerialize;
 
 export interface PrivacyPassClient {
     createTokenRequest(tokChl: TokenChallenge, issuerPublicKey: Uint8Array): Promise<TokenReq>;

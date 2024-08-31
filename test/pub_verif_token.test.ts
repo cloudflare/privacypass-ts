@@ -61,7 +61,8 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
         expect(publicKey).toBeDefined();
 
         const salt = hexToUint8(v.salt);
-        const mode = salt.length == BlindRSAMode.PSS ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
+        const mode =
+            salt.length == (BlindRSAMode.PSS as number) ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
         const nonce = hexToUint8(v.nonce);
         const blind = hexToUint8(v.blind);
         const challengeSerialized = hexToUint8(v.token_challenge);
