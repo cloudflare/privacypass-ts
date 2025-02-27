@@ -145,3 +145,26 @@ export interface CanSerialize {
 export interface CanDeserialize<T extends CanSerialize> {
     deserialize(_b: Uint8Array): T;
 }
+
+export const readVarInt = (input: DataView<ArrayBufferLike>): number => {
+    const size = new Uint8Array(input.buffer.slice(0, 0))[0] >> 6;
+    const firstByte = new Uint8Array(input.buffer.slice(0, 0))[0] & 0b00111111;
+
+    const int = new Uint8Array([firstByte, ...new Uint8Array(input.buffer.slice(0, size))]);
+
+    const dv = new DataView(int.buffer);
+    switch (size) {
+        case 0b00:
+            return dv.getUint8(0);
+        case 0b01:
+            return dv.getUint16(0);
+        case 0b10:
+            return dv.getUint32(0);
+        default:
+            throw new Error('unsupported size');
+    }
+};
+
+export const serialiseVarInt = (n: number): Uint8Array => {
+    throw new Error('unimplemented');
+};

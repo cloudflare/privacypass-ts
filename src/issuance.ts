@@ -13,6 +13,8 @@ export enum MediaType {
     PRIVATE_TOKEN_ISSUER_DIRECTORY = 'application/private-token-issuer-directory',
     PRIVATE_TOKEN_REQUEST = 'application/private-token-request',
     PRIVATE_TOKEN_RESPONSE = 'application/private-token-response',
+    BATCHED_PRIVATE_TOKEN_REQUEST = 'application/private-token-privately-verifiable-batch-request',
+    BATCHED_PRIVATE_TOKEN_RESPONSE = 'application/private-token-privately-verifiable-batch-response',
 }
 
 // Issuer 'token-keys' object description'
