@@ -16,13 +16,14 @@ import {
     DLEQProof,
 } from '@cloudflare/voprf-ts';
 import { CryptoNoble } from '@cloudflare/voprf-ts/crypto-noble';
+import * as varint from "quicvarint"
 import {
     AuthenticatorInput,
     Token,
     TokenChallenge,
     type TokenTypeEntry,
 } from './auth_scheme/private_token.js';
-import { joinAll, readVarint, serialiseVarint } from './util.js';
+import { joinAll } from './util.js';
 
 export interface VOPRFExtraParams {
     suite: SuiteID;
@@ -109,7 +110,7 @@ export class BatchedTokenRequest {
         const truncatedTokenKeyId = input.getUint8(offset);
         offset += 1;
 
-        const { value: length, usize } = readVarint(input, offset);
+        const { value: length, usize } = varint.read(input, offset);
         offset += usize;
 
         const blindedMsgs: Uint8Array[] = [];
@@ -143,7 +144,7 @@ export class BatchedTokenRequest {
             serializedBlindedMsgs[i] = blindedMsg.buffer;
         }
 
-        output.push(serialiseVarint(length).buffer);
+        output.push(varint.encode(length).buffer);
         for (const b of serializedBlindedMsgs) {
             output.push(b);
         }
@@ -174,7 +175,7 @@ export class BatchedTokenResponse {
 
     static deserialize(bytes: Uint8Array): BatchedTokenResponse {
         let offset = 0;
-        const { value, usize } = readVarint(new DataView(bytes.buffer), offset);
+        const { value, usize } = varint.read(new DataView(bytes.buffer), offset);
         offset += usize;
 
         let len = value;
@@ -201,7 +202,7 @@ export class BatchedTokenResponse {
             length += evaluateMsg.length;
         }
         return new Uint8Array(
-            joinAll([serialiseVarint(length), ...this.evaluateMsgs, this.evaluateProof]),
+            joinAll([varint.encode(length), ...this.evaluateMsgs, this.evaluateProof]),
         );
     }
 }
