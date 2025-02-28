@@ -146,25 +146,62 @@ export interface CanDeserialize<T extends CanSerialize> {
     deserialize(_b: Uint8Array): T;
 }
 
-export const readVarInt = (input: DataView<ArrayBufferLike>): number => {
-    const size = new Uint8Array(input.buffer.slice(0, 0))[0] >> 6;
-    const firstByte = new Uint8Array(input.buffer.slice(0, 0))[0] & 0b00111111;
+// implemented using https://www.rfc-editor.org/rfc/rfc9000.html#name-sample-variable-length-inte
+export const readVarint = (
+    input: DataView<ArrayBufferLike>,
+    offset: number,
+): { value: number; usize: number } => {
+    let b = input.getUint8(offset);
+    offset += 1;
 
-    const int = new Uint8Array([firstByte, ...new Uint8Array(input.buffer.slice(0, size))]);
-
-    const dv = new DataView(int.buffer);
-    switch (size) {
-        case 0b00:
-            return dv.getUint8(0);
-        case 0b01:
-            return dv.getUint16(0);
-        case 0b10:
-            return dv.getUint32(0);
-        default:
-            throw new Error('unsupported size');
+    const prefix = b >> 6;
+    if (prefix > 3) {
+        // technically, not true. there is space between 2^62 and 2^64-1 which would not require a bigint
+        // here, it's to big anyway, we won't reach these values
+        throw new Error('unsupported size');
     }
+
+    const length = 1 << prefix;
+
+    let int = b & 0b00111111;
+
+    while (offset < length) {
+        b = input.getUint8(offset);
+        offset += 1;
+
+        int = int << (8 + b);
+    }
+    return { value: int, usize: prefix };
 };
 
-export const serialiseVarInt = (n: number): Uint8Array => {
-    throw new Error('unimplemented');
+export const serialiseVarint = (n: number): Uint8Array => {
+    if (n < 0) {
+        throw new Error('Cannot encode negative numbers');
+    }
+
+    let length = 1;
+    let prefix = 0b00;
+    if (n > 0x3f) {
+        length = 2;
+        prefix = 0b01;
+    }
+    if (n > 0x3fff) {
+        length = 4;
+        prefix = 0b10;
+    }
+    // technically, not true. there is space between 2^62 and 2^64-1 which would not require a bigint
+    // here, it's to big anyway, we won't reach these values
+    if (n > 0x3fffff) {
+        throw new Error('n too large to encode');
+    }
+
+    // First byte contains the prefix in the 2-MSB and part of n
+    const bytes = new Uint8Array(length);
+    bytes[0] = (prefix << 6) | ((n >> ((length - 1) * 8)) & 0b00111111);
+
+    for (let i = 1; i < length; i++) {
+        bytes[i] = (n >> ((length - 1 - i) * 8)) & 0xff;
+    }
+
+    return bytes;
 };

@@ -21,7 +21,7 @@ import {
     TokenChallenge,
     type TokenTypeEntry,
 } from './auth_scheme/private_token.js';
-import { joinAll } from './util.js';
+import { joinAll, readVarint, serialiseVarint } from './util.js';
 
 export interface VOPRFExtraParams {
     suite: SuiteID;
@@ -107,11 +107,13 @@ export class BatchedTokenRequest {
         const truncatedTokenKeyId = input.getUint8(offset);
         offset += 1;
 
+        const { value: length, usize } = readVarint(input, offset);
+        offset += usize;
+
         const blindedMsgs: Uint8Array[] = [];
-        while (offset < bytes.length) {
-            const len = VOPRF.Ne;
-            const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
-            offset += len;
+        const endBlindedMsgs = offset + length;
+        for (offset; offset < endBlindedMsgs; offset += VOPRF.Ne) {
+            const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + VOPRF.Ne));
             blindedMsgs.push(blindedMsg);
         }
 
@@ -129,8 +131,16 @@ export class BatchedTokenRequest {
         new DataView(b).setUint8(0, this.truncatedTokenKeyId);
         output.push(b);
 
-        for (const blindedMsg of this.blindedMsgs) {
-            b = blindedMsg.buffer;
+        let length = 0;
+        const serializedBlindedMsgs = new Array<ArrayBufferLike>(this.blindedMsgs.length);
+        for (let i = 0; i < this.blindedMsgs.length; i += 1) {
+            const blindedMsg = this.blindedMsgs[i];
+            length += blindedMsg.length;
+            serializedBlindedMsgs[i] = blindedMsg.buffer;
+        }
+
+        output.push(serialiseVarint(length).buffer);
+        for (const b of serializedBlindedMsgs) {
             output.push(b);
         }
 
@@ -158,18 +168,33 @@ export class BatchedTokenResponse {
 
     static deserialize(bytes: Uint8Array): BatchedTokenResponse {
         let offset = 0;
-        let len = VOPRF.Ne;
-        const evaluateMsg = new Uint8Array(bytes.slice(offset, offset + len));
-        offset += len;
+        let { value: len, usize } = readVarint(new DataView(bytes.buffer), offset);
+        offset += usize;
+        if (len % VOPRF.Ne !== 0) {
+            throw new Error('evaludated_elements length is invalid');
+        }
+        const nElements = len / VOPRF.Ne;
+        const evaluateMsgs = new Array(nElements);
+        for (let i = 0; i < evaluateMsgs.length; i += 1) {
+            const len = VOPRF.Ne;
+            evaluateMsgs[i] = new Uint8Array(bytes.slice(offset, offset + len));
+            offset += len;
+        }
 
         len = 2 * VOPRF.Ns;
         const evaluateProof = new Uint8Array(bytes.slice(offset, offset + len));
 
-        return new BatchedTokenResponse(evaluateMsg, evaluateProof);
+        return new BatchedTokenResponse(evaluateMsgs, evaluateProof);
     }
 
     serialize(): Uint8Array {
-        return new Uint8Array(joinAll([this.evaluateMsgs, this.evaluateProof]));
+        return new Uint8Array(
+            joinAll([
+                serialiseVarint(this.evaluateMsgs.length),
+                ...this.evaluateMsgs,
+                this.evaluateProof,
+            ]),
+        );
     }
 }
 
