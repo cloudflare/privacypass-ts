@@ -54,7 +54,7 @@ const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
 //  - Token Type VOPRF (ristretto255, SHA-512)
 //
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-batched-tokens-04#name-token-type-voprf-p-384-sha-
-export const VOPRF: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
+export const VOPRF_RISTRETTO: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
     value: 0x0005,
     name: 'VOPRF (ristretto255, SHA-512)',
     Nid: 32,
@@ -65,7 +65,7 @@ export const VOPRF: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
 } as const;
 
 export function keyGen(): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> {
-    return generateKeyPair(VOPRF.suite);
+    return generateKeyPair(VOPRF_RISTRETTO.suite);
 }
 
 async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
@@ -85,12 +85,12 @@ export class BatchedTokenRequest {
         public readonly blindedMsgs: Uint8Array[],
     ) {
         for (const blindedMsg of blindedMsgs) {
-            if (blindedMsg.length !== VOPRF.Ne) {
+            if (blindedMsg.length !== VOPRF_RISTRETTO.Ne) {
                 throw new Error('blinded message has invalide size');
             }
         }
 
-        this.tokenType = VOPRF.value;
+        this.tokenType = VOPRF_RISTRETTO.value;
     }
 
     static deserialize(bytes: Uint8Array): BatchedTokenRequest {
@@ -100,7 +100,7 @@ export class BatchedTokenRequest {
         const type = input.getUint16(offset);
         offset += 2;
 
-        if (type !== VOPRF.value) {
+        if (type !== VOPRF_RISTRETTO.value) {
             throw new Error('mismatch of token type');
         }
 
@@ -112,8 +112,10 @@ export class BatchedTokenRequest {
 
         const blindedMsgs: Uint8Array[] = [];
         const endBlindedMsgs = offset + length;
-        for (offset; offset < endBlindedMsgs; offset += VOPRF.Ne) {
-            const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + VOPRF.Ne));
+        for (offset; offset < endBlindedMsgs; offset += VOPRF_RISTRETTO.Ne) {
+            const blindedMsg = new Uint8Array(
+                input.buffer.slice(offset, offset + VOPRF_RISTRETTO.Ne),
+            );
             blindedMsgs.push(blindedMsg);
         }
 
@@ -158,10 +160,10 @@ export class BatchedTokenResponse {
         public readonly evaluateMsgs: Uint8Array[],
         public readonly evaluateProof: Uint8Array,
     ) {
-        if (evaluateMsgs.length % VOPRF.Ne !== 0) {
+        if (evaluateMsgs.length % VOPRF_RISTRETTO.Ne !== 0) {
             throw new Error('evaluate_msg has invalid size');
         }
-        if (evaluateProof.length !== 2 * VOPRF.Ns) {
+        if (evaluateProof.length !== 2 * VOPRF_RISTRETTO.Ns) {
             throw new Error('evaluate_proof has invalid size');
         }
     }
@@ -170,18 +172,18 @@ export class BatchedTokenResponse {
         let offset = 0;
         let { value: len, usize } = readVarint(new DataView(bytes.buffer), offset);
         offset += usize;
-        if (len % VOPRF.Ne !== 0) {
+        if (len % VOPRF_RISTRETTO.Ne !== 0) {
             throw new Error('evaludated_elements length is invalid');
         }
-        const nElements = len / VOPRF.Ne;
+        const nElements = len / VOPRF_RISTRETTO.Ne;
         const evaluateMsgs = new Array(nElements);
         for (let i = 0; i < evaluateMsgs.length; i += 1) {
-            const len = VOPRF.Ne;
+            const len = VOPRF_RISTRETTO.Ne;
             evaluateMsgs[i] = new Uint8Array(bytes.slice(offset, offset + len));
             offset += len;
         }
 
-        len = 2 * VOPRF.Ns;
+        len = 2 * VOPRF_RISTRETTO.Ns;
         const evaluateProof = new Uint8Array(bytes.slice(offset, offset + len));
 
         return new BatchedTokenResponse(evaluateMsgs, evaluateProof);
@@ -199,7 +201,7 @@ export class BatchedTokenResponse {
 }
 
 export function verifyToken(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
-    const vServer = new VOPRFServer(VOPRF.suite, privateKeyIssuer);
+    const vServer = new VOPRFServer(VOPRF_RISTRETTO.suite, privateKeyIssuer);
     const authInput = token.authInput.serialize();
     return vServer.verifyFinalize(authInput, token.authenticator);
 }
@@ -212,11 +214,11 @@ export class Issuer {
         private privateKey: Uint8Array,
         public publicKey: Uint8Array,
     ) {
-        this.vServer = new VOPRFServer(VOPRF.suite, this.privateKey);
+        this.vServer = new VOPRFServer(VOPRF_RISTRETTO.suite, this.privateKey);
     }
 
     async issue(tokReq: BatchedTokenRequest): Promise<BatchedTokenResponse> {
-        const blindedElts = tokReq.blindedMsgs.map((b) => VOPRF.group.desElt(b));
+        const blindedElts = tokReq.blindedMsgs.map((b) => VOPRF_RISTRETTO.group.desElt(b));
         const evalReq = new EvaluationRequest(blindedElts);
         const evaluation = await this.vServer.blindEvaluate(evalReq);
 
@@ -266,8 +268,8 @@ export class Client {
             const nonce = crypto.getRandomValues(new Uint8Array(32));
 
             const authInput = new AuthenticatorInput(
-                VOPRF,
-                VOPRF.value,
+                VOPRF_RISTRETTO,
+                VOPRF_RISTRETTO.value,
                 nonce,
                 challengeDigest,
                 tokenKeyId,
@@ -276,7 +278,7 @@ export class Client {
             authInputs[i] = authInput;
         }
 
-        const vClient = new VOPRFClient(VOPRF.suite, issuerPublicKey);
+        const vClient = new VOPRFClient(VOPRF_RISTRETTO.suite, issuerPublicKey);
         const [finData, evalReq] = await vClient.blind(tokenInputs);
         if (evalReq.blinded.length !== 1) {
             throw new Error('created a non-single blinded element');
@@ -304,14 +306,14 @@ export class Client {
         }
 
         const proof = DLEQProof.deserialize(VOPRF_GROUP.id, tokRes.evaluateProof);
-        const evaluateMsgs = tokRes.evaluateMsgs.map((e) => VOPRF.group.desElt(e));
+        const evaluateMsgs = tokRes.evaluateMsgs.map((e) => VOPRF_RISTRETTO.group.desElt(e));
         const evaluation = new Evaluation(Oprf.Mode.VOPRF, evaluateMsgs, proof);
         const [authenticator] = await this.finData.vClient.finalize(
             this.finData.finData,
             evaluation,
         );
         const tokens = this.finData.authInputs.map(
-            (input) => new Token(VOPRF, input, authenticator),
+            (input) => new Token(VOPRF_RISTRETTO, input, authenticator),
         );
 
         this.finData = undefined;
@@ -321,12 +323,12 @@ export class Client {
 }
 
 export class Origin {
-    private tokenType = VOPRF;
+    private tokenType = VOPRF_RISTRETTO;
 
     constructor(public readonly originInfo?: string[]) {}
 
     async verify(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
-        const vServer = new VOPRFServer(VOPRF.suite, privateKeyIssuer);
+        const vServer = new VOPRFServer(VOPRF_RISTRETTO.suite, privateKeyIssuer);
         const authInput = token.authInput.serialize();
         return vServer.verifyFinalize(authInput, token.authenticator);
     }
