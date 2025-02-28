@@ -174,13 +174,15 @@ export class BatchedTokenResponse {
 
     static deserialize(bytes: Uint8Array): BatchedTokenResponse {
         let offset = 0;
-        let { value: len, usize } = readVarint(new DataView(bytes.buffer), offset);
+        const { value, usize } = readVarint(new DataView(bytes.buffer), offset);
         offset += usize;
+
+        let len = value;
         if (len % VOPRF_RISTRETTO.Ne !== 0) {
             throw new Error('evaluated_elements length is invalid');
         }
         const nElements = len / VOPRF_RISTRETTO.Ne;
-        const evaluateMsgs = new Array(nElements);
+        const evaluateMsgs = new Array<Uint8Array>(nElements);
         for (let i = 0; i < evaluateMsgs.length; i += 1) {
             const len = VOPRF_RISTRETTO.Ne;
             evaluateMsgs[i] = new Uint8Array(bytes.slice(offset, offset + len));
@@ -257,8 +259,8 @@ export class Client {
         issuerPublicKey: Uint8Array,
         amount: number,
     ): Promise<BatchedTokenRequest> {
-        const tokenInputs: Uint8Array[] = new Array(amount);
-        const authInputs: AuthenticatorInput[] = new Array(amount);
+        const tokenInputs = new Array<Uint8Array>(amount);
+        const authInputs = new Array<AuthenticatorInput>(amount);
 
         const challengeDigest = new Uint8Array(
             await crypto.subtle.digest('SHA-256', tokChl.serialize()),
