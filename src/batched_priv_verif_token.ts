@@ -15,6 +15,7 @@ import {
     type HashID,
     DLEQProof,
 } from '@cloudflare/voprf-ts';
+import { CryptoNoble } from '@cloudflare/voprf-ts/crypto-noble';
 import {
     AuthenticatorInput,
     Token,
@@ -33,8 +34,9 @@ export interface VOPRFExtraParams {
     dleqParams: DLEQParams;
 }
 
+Oprf.Crypto = CryptoNoble;
 const VOPRF_SUITE = Oprf.Suite.RISTRETTO255_SHA512;
-const VOPRF_GROUP = Oprf.getGroup(VOPRF_SUITE);
+const VOPRF_GROUP = Oprf.getGroup(VOPRF_SUITE, CryptoNoble);
 const VOPRF_HASH = Oprf.getHash(VOPRF_SUITE);
 const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
     suite: VOPRF_SUITE,
@@ -160,8 +162,10 @@ export class BatchedTokenResponse {
         public readonly evaluateMsgs: Uint8Array[],
         public readonly evaluateProof: Uint8Array,
     ) {
-        if (evaluateMsgs.length % VOPRF_RISTRETTO.Ne !== 0) {
-            throw new Error('evaluate_msg has invalid size');
+        for (const evaluateMsg of evaluateMsgs) {
+            if (evaluateMsg.length !== VOPRF_RISTRETTO.Ne) {
+                throw new Error('evaluate_msgs has invalid size');
+            }
         }
         if (evaluateProof.length !== 2 * VOPRF_RISTRETTO.Ns) {
             throw new Error('evaluate_proof has invalid size');
@@ -173,7 +177,7 @@ export class BatchedTokenResponse {
         let { value: len, usize } = readVarint(new DataView(bytes.buffer), offset);
         offset += usize;
         if (len % VOPRF_RISTRETTO.Ne !== 0) {
-            throw new Error('evaludated_elements length is invalid');
+            throw new Error('evaluated_elements length is invalid');
         }
         const nElements = len / VOPRF_RISTRETTO.Ne;
         const evaluateMsgs = new Array(nElements);
@@ -190,12 +194,12 @@ export class BatchedTokenResponse {
     }
 
     serialize(): Uint8Array {
+        let length = 0;
+        for (const evaluateMsg of this.evaluateMsgs) {
+            length += evaluateMsg.length;
+        }
         return new Uint8Array(
-            joinAll([
-                serialiseVarint(this.evaluateMsgs.length),
-                ...this.evaluateMsgs,
-                this.evaluateProof,
-            ]),
+            joinAll([serialiseVarint(length), ...this.evaluateMsgs, this.evaluateProof]),
         );
     }
 }
@@ -221,10 +225,6 @@ export class Issuer {
         const blindedElts = tokReq.blindedMsgs.map((b) => VOPRF_RISTRETTO.group.desElt(b));
         const evalReq = new EvaluationRequest(blindedElts);
         const evaluation = await this.vServer.blindEvaluate(evalReq);
-
-        if (evaluation.evaluated.length !== 1) {
-            throw new Error('evaluation is of a non-single element');
-        }
         const evaluateMsgs = evaluation.evaluated.map((e) => e.serialize());
 
         if (typeof evaluation.proof === 'undefined') {
@@ -280,9 +280,6 @@ export class Client {
 
         const vClient = new VOPRFClient(VOPRF_RISTRETTO.suite, issuerPublicKey);
         const [finData, evalReq] = await vClient.blind(tokenInputs);
-        if (evalReq.blinded.length !== 1) {
-            throw new Error('created a non-single blinded element');
-        }
         const blindedMsgs = evalReq.blinded.map((e) => e.serialize());
 
         // "truncated_token_key_id" is the least significant byte of the
@@ -308,13 +305,15 @@ export class Client {
         const proof = DLEQProof.deserialize(VOPRF_GROUP.id, tokRes.evaluateProof);
         const evaluateMsgs = tokRes.evaluateMsgs.map((e) => VOPRF_RISTRETTO.group.desElt(e));
         const evaluation = new Evaluation(Oprf.Mode.VOPRF, evaluateMsgs, proof);
-        const [authenticator] = await this.finData.vClient.finalize(
+        const authenticators = await this.finData.vClient.finalize(
             this.finData.finData,
             evaluation,
         );
-        const tokens = this.finData.authInputs.map(
-            (input) => new Token(VOPRF_RISTRETTO, input, authenticator),
-        );
+
+        const tokens = new Array<Token>(this.finData.authInputs.length);
+        for (let i = 0; i < tokens.length; i += 1) {
+            tokens[i] = new Token(VOPRF_RISTRETTO, this.finData.authInputs[i], authenticators[i]);
+        }
 
         this.finData = undefined;
 

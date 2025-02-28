@@ -147,10 +147,7 @@ export interface CanDeserialize<T extends CanSerialize> {
 }
 
 // implemented using https://www.rfc-editor.org/rfc/rfc9000.html#name-sample-variable-length-inte
-export const readVarint = (
-    input: DataView<ArrayBufferLike>,
-    offset: number,
-): { value: number; usize: number } => {
+export const readVarint = (input: DataView, offset: number): { value: number; usize: number } => {
     let b = input.getUint8(offset);
     offset += 1;
 
@@ -161,17 +158,15 @@ export const readVarint = (
         throw new Error('unsupported size');
     }
 
-    const length = 1 << prefix;
-
     let int = b & 0b00111111;
 
-    while (offset < length) {
+    for (let i = 0; i < prefix; i += 1) {
         b = input.getUint8(offset);
         offset += 1;
 
-        int = int << (8 + b);
+        int = (int << 8) + b;
     }
-    return { value: int, usize: prefix };
+    return { value: int, usize: prefix + 1 };
 };
 
 export const serialiseVarint = (n: number): Uint8Array => {
