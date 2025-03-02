@@ -10,6 +10,7 @@ import {
     BlindRSAMode,
 } from './pub_verif_token.js';
 import { Client as PrivateVerifClient, VOPRF } from './priv_verif_token.js';
+import { VOPRF_RISTRETTO } from './batched_priv_verif_token.js';
 import { fetchToken, type PrivacyPassClient } from './issuance.js';
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
 
@@ -18,6 +19,7 @@ export * from './auth_scheme/private_token.js';
 export * from './issuance.js';
 export * as privateVerif from './priv_verif_token.js';
 export * as publicVerif from './pub_verif_token.js';
+export * as batchedPrivateVerif from './batched_priv_verif_token.js';
 
 // Privacy Pass Token Type Registry
 // Supported:
@@ -32,6 +34,8 @@ export const TOKEN_TYPES = {
     PARTIALLY_BLIND_RSA,
     // Token Type VOPRF (P-384, SHA-384)
     VOPRF,
+    // Token Type VOPRF (ristretto255, SHA-512)
+    VOPRF_RISTRETTO,
 } as const;
 
 // The Privacy Pass HTTP Authentication Scheme
