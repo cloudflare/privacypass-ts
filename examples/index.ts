@@ -3,6 +3,7 @@
 
 import { webcrypto } from 'node:crypto';
 
+import { arbitraryBatchedTokens } from './arbitrary_batched.example.js';
 import { publicVerifiableTokens } from './pub_verif.example.js';
 import { publicVerifiableWithMetadataTokens } from './pub_verif_metadata.example.js';
 import { privateVerifiableTokens } from './priv_verif.example.js';
@@ -12,6 +13,7 @@ if (typeof crypto === 'undefined') {
 }
 
 async function examples() {
+    await arbitraryBatchedTokens();
     await privateVerifiableTokens();
     await publicVerifiableTokens();
     await publicVerifiableWithMetadataTokens();

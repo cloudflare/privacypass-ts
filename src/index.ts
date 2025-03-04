@@ -16,6 +16,7 @@ import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
 export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
 export * from './auth_scheme/private_token.js';
 export * from './issuance.js';
+export * as arbitraryBatched from './arbitrary_batched_token.js';
 export * as privateVerif from './priv_verif_token.js';
 export * as publicVerif from './pub_verif_token.js';
 

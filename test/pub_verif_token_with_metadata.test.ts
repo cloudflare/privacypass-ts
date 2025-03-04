@@ -2,13 +2,11 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { jest } from '@jest/globals';
-import { base64 } from 'rfc4648';
 
 import {
-    util,
+    Token,
     TokenChallenge,
     TOKEN_TYPES,
-    Token,
     AuthorizationHeader,
     publicVerif,
     Extensions,
@@ -26,38 +24,9 @@ import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util
 
 // Ad-hoc vectors, to be merged with the draft
 import vectors from './test_data/pub_verif_with_metadata_v3.json';
-
 type Vectors = (typeof vectors)[number];
 
-async function keysFromVector(v: Vectors): Promise<[CryptoKeyPair, Uint8Array]> {
-    const hexEncoded = hexToUint8(v.skS);
-    const pem = new TextDecoder().decode(hexEncoded);
-    const pemHeader = '-----BEGIN PRIVATE KEY-----';
-    const pemFooter = '-----END PRIVATE KEY-----';
-    const pemContents = pem.replace(pemHeader, '').replace(pemFooter, '');
-    const trimPemContents = pemContents.replace(/\s+/g, '');
-    const payload = base64.parse(trimPemContents);
-
-    const privateKey = await crypto.subtle.importKey(
-        'pkcs8',
-        payload,
-        { name: 'RSA-PSS', hash: 'SHA-384' },
-        true,
-        ['sign'],
-    );
-
-    const spkiEncoded = util.convertRSASSAPSSToEnc(hexToUint8(v.pkS));
-    const publicKey = await crypto.subtle.importKey(
-        'spki',
-        spkiEncoded,
-        { name: 'RSA-PSS', hash: 'SHA-384' },
-        true,
-        ['verify'],
-    );
-    const publicKeyEnc = hexToUint8(v.pkS);
-
-    return [{ privateKey, publicKey }, publicKeyEnc];
-}
+import { keysFromVector } from './pub_verif_token.js';
 
 describe.each(vectors)('PublicVerifiableMetadata-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];

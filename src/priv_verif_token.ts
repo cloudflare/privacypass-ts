@@ -15,8 +15,12 @@ import {
     type HashID,
     DLEQProof,
 } from '@cloudflare/voprf-ts';
-import type { TokenChallenge } from './auth_scheme/private_token.js';
-import { AuthenticatorInput, Token, type TokenTypeEntry } from './auth_scheme/private_token.js';
+import {
+    AuthenticatorInput,
+    Token,
+    TokenChallenge,
+    type TokenTypeEntry,
+} from './auth_scheme/private_token.js';
 import { joinAll } from './util.js';
 
 export interface VOPRFExtraParams {
@@ -196,6 +200,10 @@ export class Issuer {
         return new TokenResponse(evaluateMsg, evaluateProof);
     }
 
+    tokenKeyID(): Promise<Uint8Array> {
+        return getTokenKeyID(this.publicKey);
+    }
+
     verify(token: Token): Promise<boolean> {
         const authInput = token.authInput.serialize();
         return this.vServer.verifyFinalize(authInput, token.authenticator);
@@ -267,5 +275,26 @@ export class Client {
         this.finData = undefined;
 
         return token;
+    }
+}
+
+export class Origin {
+    private tokenType = VOPRF;
+
+    constructor(public readonly originInfo?: string[]) {}
+
+    async verify(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {
+        const vServer = new VOPRFServer(VOPRF.suite, privateKeyIssuer);
+        const authInput = token.authInput.serialize();
+        return vServer.verifyFinalize(authInput, token.authenticator);
+    }
+
+    createTokenChallenge(issuerName: string, redemptionContext: Uint8Array): TokenChallenge {
+        return new TokenChallenge(
+            this.tokenType.value,
+            issuerName,
+            redemptionContext,
+            this.originInfo,
+        );
     }
 }
