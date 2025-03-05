@@ -42,3 +42,50 @@ if (typeof crypto === 'undefined') {
     Object.assign(global, { crypto: webcrypto });
 }
 crypto.subtle.sign = mockSign;
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const parentImportKey = webcrypto.subtle.importKey;
+
+async function mockImportKey(
+    format: KeyFormat,
+    keyData: JsonWebKey | BufferSource,
+    algorithm: AlgorithmIdentifier,
+    extractable: boolean,
+    keyUsages: KeyUsage[],
+): Promise<CryptoKey> {
+    crypto.subtle.importKey = parentImportKey;
+    try {
+        if (format === 'jwk') {
+            return await crypto.subtle.importKey(
+                format,
+                keyData as JsonWebKey,
+                algorithm,
+                extractable,
+                keyUsages,
+            );
+        }
+        const data: BufferSource = keyData as BufferSource;
+        if (
+            algorithm === 'RSA-RAW' ||
+            (!(typeof algorithm === 'string') && algorithm.name === 'RSA-RAW')
+        ) {
+            if (typeof algorithm === 'string') {
+                algorithm = { name: 'RSA-PSS' };
+            } else {
+                algorithm = { ...algorithm, name: 'RSA-PSS' };
+            }
+            const key = await crypto.subtle.importKey(
+                format,
+                data,
+                algorithm,
+                extractable,
+                keyUsages,
+            );
+            key.algorithm.name = 'RSA-RAW';
+            return key;
+        }
+        return await crypto.subtle.importKey(format, data, algorithm, extractable, keyUsages);
+    } finally {
+        crypto.subtle.importKey = mockImportKey;
+    }
+}
+crypto.subtle.importKey = mockImportKey;

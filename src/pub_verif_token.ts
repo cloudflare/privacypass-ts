@@ -226,9 +226,9 @@ abstract class PubliclyVerifiableIssuer {
     ) {
         this.suite = (extensions?: Extensions) => {
             if (extensions === undefined) {
-                return BLIND_RSA.suite[this.mode]();
+                return BLIND_RSA.suite[this.mode](this.params);
             } else {
-                const suite = PARTIALLY_BLIND_RSA.suite[this.mode]();
+                const suite = PARTIALLY_BLIND_RSA.suite[this.mode](this.params);
                 const serializedExtensions = extensions.serialize();
                 return {
                     blindSign: (privateKey: CryptoKey, blindMsg: Uint8Array) =>
