@@ -1,6 +1,8 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
+import { describe, expect, it } from 'vitest';
+
 import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/util.js';
 
 describe('RSA-PSS', () => {

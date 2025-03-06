@@ -4,7 +4,7 @@
 /* eslint-disable security/detect-object-injection */
 
 import { VOPRFClient } from '@cloudflare/voprf-ts';
-import { jest } from '@jest/globals';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
     BatchedTokenRequest,
@@ -51,8 +51,8 @@ describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
                     const publicKey = hexToUint8(issuance.pkS);
 
                     // Mock for randomized operations.
-                    jest.spyOn(crypto, 'getRandomValues').mockReturnValueOnce(nonce);
-                    jest.spyOn(VOPRFClient.prototype, 'randomBlinder').mockReturnValueOnce(
+                    vi.spyOn(crypto, 'getRandomValues').mockReturnValueOnce(nonce);
+                    vi.spyOn(VOPRFClient.prototype, 'randomBlinder').mockReturnValueOnce(
                         Promise.resolve(TOKEN_TYPES.VOPRF.group.desScalar(blind)),
                     );
 
@@ -79,7 +79,7 @@ describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
                             ? BlindRSAMode.PSS
                             : BlindRSAMode.PSSZero;
 
-                    jest.spyOn(crypto, 'getRandomValues')
+                    vi.spyOn(crypto, 'getRandomValues')
                         .mockReturnValueOnce(nonce)
                         .mockReturnValueOnce(salt)
                         .mockReturnValueOnce(blind);

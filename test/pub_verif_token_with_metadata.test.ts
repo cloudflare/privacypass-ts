@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { jest } from '@jest/globals';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
     Token,
@@ -49,7 +49,7 @@ describe.each(vectors)('PublicVerifiableMetadata-Vector-%#', (v: Vectors) => {
         const extensions = Extensions.deserialize(extensionsSerialized);
 
         // Mock for randomized operations.
-        jest.spyOn(crypto, 'getRandomValues')
+        vi.spyOn(crypto, 'getRandomValues')
             .mockReturnValueOnce(nonce)
             .mockReturnValueOnce(salt)
             .mockReturnValueOnce(blind);
