@@ -1,8 +1,8 @@
 // Copyright (c) 2023 Cloudflare, Inc.
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
-import { jest } from '@jest/globals';
 import { VOPRFClient } from '@cloudflare/voprf-ts';
+import { expect, test, vi } from 'vitest';
 
 import {
     TokenChallenge,
@@ -30,8 +30,8 @@ test.each(vectors)('PrivateVerifiable-Vector-%#', async (v: Vectors) => {
     const tokChl = TokenChallenge.deserialize(challengeSerialized);
 
     // Mock for randomized operations.
-    jest.spyOn(crypto, 'getRandomValues').mockReturnValueOnce(nonce);
-    jest.spyOn(VOPRFClient.prototype, 'randomBlinder').mockReturnValueOnce(
+    vi.spyOn(crypto, 'getRandomValues').mockReturnValueOnce(nonce);
+    vi.spyOn(VOPRFClient.prototype, 'randomBlinder').mockReturnValueOnce(
         Promise.resolve(TOKEN_TYPES.VOPRF.group.desScalar(blind)),
     );
 

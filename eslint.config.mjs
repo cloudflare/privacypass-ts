@@ -2,18 +2,19 @@ import eslintJS from '@eslint/js'
 import eslintTS from 'typescript-eslint'
 import pluginPrettier from 'eslint-plugin-prettier/recommended'
 import pluginSecurity from 'eslint-plugin-security'
-import pluginJest from 'eslint-plugin-jest'
+import pluginVitest from 'eslint-plugin-vitest'
 
 export default eslintTS.config(
     eslintJS.configs.recommended,
     ...eslintTS.configs.strictTypeChecked,
-    pluginJest.configs['flat/recommended'],
     pluginSecurity.configs.recommended,
+    pluginVitest.configs.recommended,
     {
         ignores: [
             'eslint.config.mjs',
             'coverage/*',
-            'lib/*'
+            'lib/*',
+            'vitest.config.ts',
         ]
     },
     {
