@@ -25,7 +25,7 @@
     "homepage": "https://github.com/cloudflare/privacypass-ts#readme",
     "repository": "github:cloudflare/privacypass-ts",
     "engines": {
-        "node": ">=18"
+        "node": ">=20"
     },
     "scripts": {
         "build": "tsc -b",
@@ -37,7 +37,7 @@
         "clean": "tsc -b --clean && rimraf lib coverage dist"
     },
     "dependencies": {
-        "@cloudflare/blindrsa-ts": "0.4.2",
+        "@cloudflare/blindrsa-ts": "0.4.3",
         "@cloudflare/voprf-ts": "1.0.0",
         "asn1-parser": "1.1.8",
         "asn1js": "3.0.5",

@@ -24,7 +24,6 @@ export enum BlindRSAMode {
 }
 
 export import PartiallyBlindRSAMode = BlindRSAMode;
-import type { PartiallyBlindRSAPlatformParams } from '@cloudflare/blindrsa-ts/lib/src/partially_blindrsa.js';
 
 export interface BlindRSAExtraParams {
     suite: Record<BlindRSAMode, (params?: BlindRSAPlatformParams) => BlindRSA>;
@@ -222,7 +221,7 @@ abstract class PubliclyVerifiableIssuer {
         public readonly name: string,
         private readonly privateKey: CryptoKey,
         public readonly publicKey: CryptoKey,
-        public readonly params?: BlindRSAPlatformParams | PartiallyBlindRSAPlatformParams,
+        public readonly params?: BlindRSAPlatformParams,
     ) {
         this.suite = (extensions?: Extensions) => {
             if (extensions === undefined) {
