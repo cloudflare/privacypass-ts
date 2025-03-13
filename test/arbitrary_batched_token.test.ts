@@ -150,3 +150,10 @@ describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
         }
     });
 });
+
+describe('arbitrary batched unit tests', () => {
+    test('client should support initialisation with zero TokenRequest', () => {
+        const newClient = () => new BatchedTokenRequest([]);
+        expect(newClient).not.toThrow();
+    });
+});
