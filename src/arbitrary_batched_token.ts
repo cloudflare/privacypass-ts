@@ -296,10 +296,6 @@ export class Issuer {
 
 export class Client {
     createTokenRequest(tokenRequests: TokenRequest[]): BatchedTokenRequest {
-        if (tokenRequests.length === 0) {
-            throw new Error('no token request');
-        }
-
         return new BatchedTokenRequest(tokenRequests);
     }
 
