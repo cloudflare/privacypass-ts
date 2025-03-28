@@ -25,6 +25,7 @@ async function setupPublicVerif(mode: BlindRSAMode) {
 
     return { issuer, client, origin, pkIssuer };
 }
+
 async function setup() {
     const s1 = await setupPublicVerif(publicVerif.BlindRSAMode.PSS);
     const s2 = await setupPublicVerif(publicVerif.BlindRSAMode.PSSZero);

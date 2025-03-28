@@ -97,7 +97,7 @@ function getCryptoKey(publicKey: Uint8Array): Promise<CryptoKey> {
 }
 
 export async function getPublicKeyBytes(publicKey: CryptoKey): Promise<Uint8Array> {
-    return new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
+    return convertEncToRSASSAPSS(new Uint8Array(await crypto.subtle.exportKey('spki', publicKey)));
 }
 
 async function getTokenKeyID(publicKey: Uint8Array): Promise<Uint8Array> {
@@ -245,7 +245,7 @@ abstract class PubliclyVerifiableIssuer {
     }
 
     async tokenKeyID(): Promise<Uint8Array> {
-        return getTokenKeyID(convertEncToRSASSAPSS(await getPublicKeyBytes(this.publicKey)));
+        return getTokenKeyID(await getPublicKeyBytes(this.publicKey));
     }
 
     verify(token: Token): Promise<boolean> {
