@@ -11,13 +11,15 @@ import {
     publicVerif,
     tokenRequestToTokenTypeEntry,
 } from '../src/index.js';
-const { Client, Issuer, Origin, TokenRequest, TokenResponse, BlindRSAMode } = publicVerif;
+const { BlindRSAMode, Client, Issuer, Origin, TokenRequest, TokenResponse, getPublicKeyBytes } =
+    publicVerif;
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
 import vectors from './test_data/pub_verif_v16.json';
 import { keysFromVector, type Vectors } from './pub_verif_token.js';
+import { convertEncToRSASSAPSS } from '../src/util.js';
 
 describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];
@@ -75,5 +77,28 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
         expect(parsedToken.token.authInput.tokenKeyId).toEqual(token.authInput.tokenKeyId);
         expect(parsedToken.token.authInput.tokenType).toBe(token.authInput.tokenType);
         expect(parsedToken.token.authenticator).toEqual(token.authenticator);
+    });
+});
+
+describe('getPublicKeyBytes', () => {
+    const modes = [BlindRSAMode.PSS, BlindRSAMode.PSSZero];
+
+    test.each(modes)('it should use RSAPSS and not enc', async (mode) => {
+        const keys = await Issuer.generateKey(mode, {
+            modulusLength: 2048,
+            publicExponent: Uint8Array.from([1, 0, 1]),
+        });
+        const issuer = new Issuer(mode, 'issuer.com', keys.privateKey, keys.publicKey);
+        const pkIssuer = await getPublicKeyBytes(issuer.publicKey);
+
+        const publicKeyEnc = new Uint8Array(
+            await crypto.subtle.exportKey('spki', issuer.publicKey),
+        );
+
+        // We don't want the public key to be enc. It should be RSAPSS
+        expect(pkIssuer).not.toEqual(publicKeyEnc);
+
+        const publicKeyRSAPSS = convertEncToRSASSAPSS(publicKeyEnc);
+        expect(pkIssuer).toEqual(publicKeyRSAPSS);
     });
 });
