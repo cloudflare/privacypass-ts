@@ -38,7 +38,7 @@ async function setup() {
     };
 }
 
-async function rsaVariant(): Promise<void> {
+async function rsaVariant(): Promise<boolean> {
     // Protocol Setup
     //
     // [ Everybody ] agree to use Public Verifiable Tokens.
@@ -97,8 +97,9 @@ async function rsaVariant(): Promise<void> {
 
     console.log('Arbitrary batched tokens');
     console.log(`    Valid token: ${isValid}`);
+    return isValid;
 }
 
-export async function arbitraryBatchedTokens() {
-    await rsaVariant();
+export function arbitraryBatchedTokens(): Promise<boolean> {
+    return rsaVariant();
 }

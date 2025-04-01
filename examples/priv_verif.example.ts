@@ -4,7 +4,7 @@
 import { TOKEN_TYPES, privateVerif } from '../src/index.js';
 const { Client, Issuer, Origin, keyGen } = privateVerif;
 
-export async function privateVerifiableTokens(): Promise<void> {
+export async function privateVerifiableTokens(): Promise<boolean> {
     // Protocol Setup
 
     // [ Issuer ] creates a key pair.
@@ -44,4 +44,5 @@ export async function privateVerifiableTokens(): Promise<void> {
     console.log('Private-Verifiable tokens');
     console.log(`    Suite: ${TOKEN_TYPES.VOPRF.name}`);
     console.log(`    Valid token: ${isValid}`);
+    return isValid;
 }

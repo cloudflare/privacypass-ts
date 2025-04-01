@@ -43,7 +43,7 @@ function createTestExtension(info = new Uint8Array([TEST_EXTENSION_TYPE])) {
     return new Extension(TEST_EXTENSION_TYPE, info);
 }
 
-async function rsaVariant(mode: PartiallyBlindRSAMode): Promise<void> {
+async function rsaVariant(mode: PartiallyBlindRSAMode): Promise<boolean> {
     // Protocol Setup
     //
     // [ Everybody ] agree to use Public Verifiable Tokens with Metadata.
@@ -78,9 +78,13 @@ async function rsaVariant(mode: PartiallyBlindRSAMode): Promise<void> {
         `    Suite: ${TOKEN_TYPES.PARTIALLY_BLIND_RSA.suite[mode as unknown as PartiallyBlindRSAMode]()}`,
     );
     console.log(`    Valid token: ${isValid}`);
+    return isValid;
 }
 
-export async function publicVerifiableWithMetadataTokens() {
-    await rsaVariant(PartiallyBlindRSAMode.PSS);
-    await rsaVariant(PartiallyBlindRSAMode.PSSZero);
+export function publicVerifiableWithMetadataTokensPSS(): Promise<boolean> {
+    return rsaVariant(PartiallyBlindRSAMode.PSS);
+}
+
+export function publicVerifiableWithMetadataTokensPSSZero(): Promise<boolean> {
+    return rsaVariant(PartiallyBlindRSAMode.PSSZero);
 }
