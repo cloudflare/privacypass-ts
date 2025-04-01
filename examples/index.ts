@@ -4,19 +4,31 @@
 import { webcrypto } from 'node:crypto';
 
 import { arbitraryBatchedTokens } from './arbitrary_batched.example.js';
-import { publicVerifiableTokens } from './pub_verif.example.js';
-import { publicVerifiableWithMetadataTokens } from './pub_verif_metadata.example.js';
+import { publicVerifiableTokensPSS, publicVerifiableTokensPSSZero } from './pub_verif.example.js';
+import {
+    publicVerifiableWithMetadataTokensPSS,
+    publicVerifiableWithMetadataTokensPSSZero,
+} from './pub_verif_metadata.example.js';
 import { privateVerifiableTokens } from './priv_verif.example.js';
 
 if (typeof crypto === 'undefined') {
     Object.assign(global, { crypto: webcrypto });
 }
 
+async function isOk(fn: () => Promise<boolean>) {
+    if (!(await fn())) {
+        console.error(`[Error] ${fn} example failed`);
+        process.exitCode = 1;
+    }
+}
+
 async function examples() {
-    await arbitraryBatchedTokens();
-    await privateVerifiableTokens();
-    await publicVerifiableTokens();
-    await publicVerifiableWithMetadataTokens();
+    await isOk(arbitraryBatchedTokens);
+    await isOk(privateVerifiableTokens);
+    await isOk(publicVerifiableTokensPSS);
+    await isOk(publicVerifiableTokensPSSZero);
+    await isOk(publicVerifiableWithMetadataTokensPSS);
+    await isOk(publicVerifiableWithMetadataTokensPSSZero);
 }
 
 examples().catch((e: unknown) => {

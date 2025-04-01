@@ -23,7 +23,7 @@ async function setup(mode: BlindRSAMode) {
     return { issuer, client, origin, pkIssuer };
 }
 
-async function rsaVariant(mode: BlindRSAMode): Promise<void> {
+async function rsaVariant(mode: BlindRSAMode): Promise<boolean> {
     // Protocol Setup
     //
     // [ Everybody ] agree to use Public Verifiable Tokens.
@@ -55,9 +55,12 @@ async function rsaVariant(mode: BlindRSAMode): Promise<void> {
     console.log('Public-Verifiable tokens');
     console.log(`    Suite: ${TOKEN_TYPES.BLIND_RSA.suite[mode as unknown as BlindRSAMode]()}`);
     console.log(`    Valid token: ${isValid}`);
+    return isValid;
 }
 
-export async function publicVerifiableTokens() {
-    await rsaVariant(BlindRSAMode.PSS);
-    await rsaVariant(BlindRSAMode.PSSZero);
+export function publicVerifiableTokensPSS() {
+    return rsaVariant(BlindRSAMode.PSS);
+}
+export function publicVerifiableTokensPSSZero() {
+    return rsaVariant(BlindRSAMode.PSSZero);
 }
