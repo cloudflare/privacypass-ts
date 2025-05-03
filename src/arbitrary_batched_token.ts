@@ -3,7 +3,12 @@
 
 import * as varint from 'quicvarint';
 
-import { type Token, TOKEN_TYPES, tokenRequestToTokenTypeEntry } from './index.js';
+import {
+    type Token,
+    TOKEN_TYPES,
+    tokenEntryToSerializedLength,
+    tokenRequestToTokenTypeEntry,
+} from './index.js';
 import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv_verif_token.js';
 import { Issuer as Type2Issuer, TokenRequest as Type2TokenRequest } from './pub_verif_token.js';
 import { joinAll } from './util.js';
@@ -73,8 +78,8 @@ export class BatchedTokenRequest {
         const batchedTokenRequests: TokenRequest[] = [];
 
         while (offset < bytes.length) {
-            const len = input.getUint16(offset);
-            offset += 2;
+            const tokenTypeEntry = tokenRequestToTokenTypeEntry(bytes);
+            const len = tokenEntryToSerializedLength(tokenTypeEntry);
             const b = new Uint8Array(input.buffer.slice(offset, offset + len));
             offset += len;
 
@@ -90,12 +95,6 @@ export class BatchedTokenRequest {
         let length = 0;
         for (const tokenRequest of this.tokenRequests) {
             const tokenRequestSerialized = tokenRequest.serialize();
-
-            const b = new ArrayBuffer(2);
-            new DataView(b).setUint16(0, tokenRequestSerialized.length);
-            output.push(b);
-            length += 2;
-
             output.push(tokenRequestSerialized.buffer);
             length += tokenRequestSerialized.length;
         }
