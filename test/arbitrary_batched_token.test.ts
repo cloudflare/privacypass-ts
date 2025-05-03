@@ -26,8 +26,11 @@ import { keysFromVector as type2KeysFromVector } from './pub_verif_token.js';
 import { hexToUint8, testSerialize, uint8ToHex } from './util.js';
 
 // https://github.com/cloudflare/pat-go/blob/main/tokens/batched/batched-issuance-test-vectors.json
-import vectors from './test_data/arbitrary_batched_tokens_v4.json';
+import vectorsGo from './test_data/arbitrary_batched_tokens_v5_go.json';
+// https://raw.githubusercontent.com/raphaelrobert/privacypass/0600835c039c4b89f2137be3f5b1ecbeffe05417/tests/kat_vectors/arbitrary_rs.json
+import vectorsRust from './test_data/arbitrary_batched_tokens_v5_rs.json';
 
+const vectors = [...vectorsGo, ...vectorsRust];
 type Vectors = (typeof vectors)[number];
 
 describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
