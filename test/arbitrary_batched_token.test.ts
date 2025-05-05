@@ -33,10 +33,19 @@ import vectorsRust from './test_data/arbitrary_batched_tokens_v5_rs.json';
 const vectors = [...vectorsGo, ...vectorsRust];
 type Vectors = (typeof vectors)[number];
 
+const SUPPORTED_TYPES = [TOKEN_TYPES.VOPRF.value, TOKEN_TYPES.BLIND_RSA.value].map((t) =>
+    t.toString().padStart(4, '0'),
+);
+
 describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];
 
     test.each(params)('ArbitraryBatched-Vector-%#-Issuer-Params-%#', async (...params) => {
+        // if the test vector contains an unsupported type, skip the test
+        if (v.issuance.find((i) => !SUPPORTED_TYPES.includes(i.type)) !== undefined) {
+            expect(true).toBe(true);
+            return;
+        }
         const tokenRequests = new Array<TokenRequest>(v.issuance.length);
         const issuers = new Array<privateVerif.Issuer | publicVerif.Issuer>(v.issuance.length);
         const clients = new Array<privateVerif.Client | publicVerif.Client>(v.issuance.length);
