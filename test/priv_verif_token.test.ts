@@ -16,8 +16,12 @@ const { Client, Issuer, TokenRequest, TokenResponse, VOPRF } = privateVerif;
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
-import vectors from './test_data/priv_verif_v16.json';
+// https://www.rfc-editor.org/rfc/rfc9578.html#name-issuance-protocol-1-voprfp-
+import vectorsGo from './test_data/priv_verif_rfc9578.go.json';
+// https://raw.githubusercontent.com/raphaelrobert/privacypass/refs/heads/main/tests/kat_vectors/private_p384_rs.json
+import vectorsRust from './test_data/priv_verif_rfc9578.rust.json';
+
+const vectors = [...vectorsGo, ...vectorsRust];
 
 type Vectors = (typeof vectors)[number];
 

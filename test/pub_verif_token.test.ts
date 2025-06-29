@@ -16,8 +16,13 @@ const { BlindRSAMode, Client, Issuer, Origin, TokenRequest, TokenResponse, getPu
 
 import { hexToUint8, testSerialize, testSerializeType, uint8ToHex } from './util.js';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
-import vectors from './test_data/pub_verif_v16.json';
+// https://www.rfc-editor.org/rfc/rfc9578.html#name-issuance-protocol-2-blind-r
+import vectorsGo from './test_data/pub_verif_rfc9578.go.json';
+// https://raw.githubusercontent.com/raphaelrobert/privacypass/refs/heads/main/tests/kat_vectors/public_rs.json
+import vectorsRust from './test_data/pub_verif_rfc9578.rust.json';
+
+const vectors = [...vectorsGo, ...vectorsRust];
+
 import { keysFromVector, type Vectors } from './pub_verif_token.js';
 import { convertEncToRSASSAPSS } from '../src/util.js';
 
