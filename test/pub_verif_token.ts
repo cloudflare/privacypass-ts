@@ -7,10 +7,12 @@ import { util } from '../src/index.js';
 
 import { hexToUint8 } from './util.js';
 
-// https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-test-vectors
-import v from './test_data/pub_verif_v16.json';
+// https://www.rfc-editor.org/rfc/rfc9578.html#name-issuance-protocol-2-blind-r
+import vectorsGo from './test_data/pub_verif_rfc9578.go.json';
+// https://raw.githubusercontent.com/raphaelrobert/privacypass/refs/heads/main/tests/kat_vectors/public_rs.json
+import vectorsRust from './test_data/pub_verif_rfc9578.rust.json';
 
-export const vectors = v;
+export const vectors = [...vectorsGo, ...vectorsRust];
 
 export type Vectors = (typeof vectors)[number];
 
