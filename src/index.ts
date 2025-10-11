@@ -82,8 +82,6 @@ export async function header_to_token(header: string): Promise<string | null> {
             return null;
     }
 
-    const te = new TextEncoder();
     const authHeader = await fetchToken(client, pt);
-    const encodedToken = base64url.stringify(te.encode(authHeader.toString()));
-    return encodedToken;
+    return authHeader.toString();
 }
