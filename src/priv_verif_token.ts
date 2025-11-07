@@ -85,7 +85,7 @@ export class TokenRequest {
         public readonly blindedMsg: Uint8Array,
     ) {
         if (blindedMsg.length !== VOPRF.Ne) {
-            throw new Error('blinded message has invalide size');
+            throw new Error('blinded message has invalid size');
         }
 
         this.tokenType = VOPRF.value;
