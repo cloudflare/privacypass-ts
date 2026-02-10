@@ -8,10 +8,10 @@ import { describe, expect, test, vi } from 'vitest';
 
 import {
     BatchedTokenRequest,
-    BatchedTokenResponse,
+    GenericBatchTokenResponse,
     Issuer,
     TokenRequest,
-} from '../src/arbitrary_batched_token';
+} from '../src/generic_batched_token';
 import {
     type Token,
     TokenChallenge,
@@ -26,9 +26,9 @@ import { keysFromVector as type2KeysFromVector } from './pub_verif_token.js';
 import { hexToUint8, testSerialize, uint8ToHex } from './util.js';
 
 // https://github.com/cloudflare/pat-go/blob/main/tokens/batched/batched-issuance-test-vectors.json
-import vectorsGo from './test_data/arbitrary_batched_tokens_v5_go.json';
-// https://raw.githubusercontent.com/raphaelrobert/privacypass/0600835c039c4b89f2137be3f5b1ecbeffe05417/tests/kat_vectors/arbitrary_rs.json
-import vectorsRust from './test_data/arbitrary_batched_tokens_v5_rs.json';
+import vectorsGo from './test_data/generic_batched_tokens_v6_go.json';
+// https://raw.githubusercontent.com/raphaelrobert/privacypass/0600835c039c4b89f2137be3f5b1ecbeffe05417/tests/kat_vectors/generic_rs.json
+import vectorsRust from './test_data/generic_batched_tokens_v6_rs.json';
 
 const vectors = [...vectorsGo, ...vectorsRust];
 type Vectors = (typeof vectors)[number];
@@ -37,10 +37,10 @@ const SUPPORTED_TYPES = [TOKEN_TYPES.VOPRF.value, TOKEN_TYPES.BLIND_RSA.value].m
     t.toString().padStart(4, '0'),
 );
 
-describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
+describe.each(vectors)('GenericBatched-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];
 
-    test.each(params)('ArbitraryBatched-Vector-%#-Issuer-Params-%#', async (...params) => {
+    test.each(params)('GenericBatched-Vector-%#-Issuer-Params-%#', async (...params) => {
         // if the test vector contains an unsupported type, skip the test
         if (v.issuance.find((i) => !SUPPORTED_TYPES.includes(i.type)) !== undefined) {
             expect(true).toBe(true);
@@ -125,7 +125,7 @@ describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
         const issuer = new Issuer(...issuers);
 
         const tokRes = await issuer.issue(tokReq);
-        testSerialize(BatchedTokenResponse, tokRes);
+        testSerialize(GenericBatchTokenResponse, tokRes);
 
         for (let i = 0; i < v.issuance.length; i += 1) {
             const issuance = v.issuance[i];
@@ -163,7 +163,7 @@ describe.each(vectors)('ArbitraryBatched-Vector-%#', (v: Vectors) => {
     });
 });
 
-describe('arbitrary batched unit tests', () => {
+describe('generic batched unit tests', () => {
     test('client should support initialisation with zero TokenRequest', () => {
         const newClient = () => new BatchedTokenRequest([]);
         expect(newClient).not.toThrow();

@@ -13,6 +13,13 @@ import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv
 import { Issuer as Type2Issuer, TokenRequest as Type2TokenRequest } from './pub_verif_token.js';
 import { joinAll } from './util.js';
 
+const TokenStatus = {
+    ABSENT: 0x00,
+    PRESENT: 0x01,
+} as const;
+
+type TokenStatus = (typeof TokenStatus)[keyof typeof TokenStatus];
+
 export class TokenRequest {
     // struct {
     //     uint16_t token_type;
@@ -121,35 +128,39 @@ export class BatchedTokenRequest {
 
 export class OptionalTokenResponse {
     // struct {
-    //     TokenResponse token_response<0..2^16-1>; /* Defined by token_type */
+    //     optional<GenericTokenResponse> generic_token_response; /* Defined by token_type */
     // } OptionalTokenResponse;
     constructor(public readonly tokenResponse: null | Uint8Array) {}
 
     static deserialize(bytes: Uint8Array): OptionalTokenResponse {
         if (bytes.length === 0) {
-            return new OptionalTokenResponse(null);
+            throw new Error('OptionalTokenResponse MUST be of length strictly greater than 0');
         }
-        return new OptionalTokenResponse(bytes);
+        switch (bytes[0]) {
+            case TokenStatus.ABSENT:
+                return new OptionalTokenResponse(null);
+            case TokenStatus.PRESENT:
+                return new OptionalTokenResponse(bytes.slice(1));
+            default:
+                throw new Error('OptionalTokenResponse MUST start with either 0x00 or 0x01');
+        }
     }
 
     serialize(): Uint8Array {
         if (this.tokenResponse === null) {
-            return new Uint8Array();
+            return new Uint8Array([TokenStatus.ABSENT]);
         }
-        return this.tokenResponse;
+        return new Uint8Array([TokenStatus.PRESENT, ...this.tokenResponse]);
     }
 }
 
-// struct {
-//     OptionalTokenResponse token_responses<0..2^16-1>;
-// } BatchTokenResponse
-export class BatchedTokenResponse {
+export class GenericBatchTokenResponse {
     // struct {
-    //     TokenRequest token_requests<V>;
-    // } BatchTokenRequest
+    //   OptionalTokenResponse optional_token_responses<V>;
+    // } GenericBatchTokenResponse
     constructor(public readonly tokenResponses: OptionalTokenResponse[]) {}
 
-    static deserialize(bytes: Uint8Array): BatchedTokenResponse {
+    static deserialize(bytes: Uint8Array): GenericBatchTokenResponse {
         let offset = 0;
         const input = new DataView(bytes.buffer);
 
@@ -171,7 +182,7 @@ export class BatchedTokenResponse {
             batchedTokenResponses.push(OptionalTokenResponse.deserialize(b));
         }
 
-        return new BatchedTokenResponse(batchedTokenResponses);
+        return new GenericBatchTokenResponse(batchedTokenResponses);
     }
 
     serialize(): Uint8Array {
@@ -180,11 +191,6 @@ export class BatchedTokenResponse {
         let length = 0;
         for (const tokenResponse of this.tokenResponses) {
             const tokenResponseSerialized = tokenResponse.serialize();
-
-            const b = new ArrayBuffer(2);
-            new DataView(b).setUint16(0, tokenResponseSerialized.length);
-            output.push(b);
-            length += 2;
 
             output.push(tokenResponseSerialized);
             length += tokenResponseSerialized.length;
@@ -246,7 +252,7 @@ export class Issuer {
         throw new Error('no issuer found provided the truncated token key id');
     }
 
-    async issue(tokenRequests: BatchedTokenRequest): Promise<BatchedTokenResponse> {
+    async issue(tokenRequests: BatchedTokenRequest): Promise<GenericBatchTokenResponse> {
         const tokenResponses: OptionalTokenResponse[] = [];
         for (const tokenRequest of tokenRequests) {
             try {
@@ -262,7 +268,7 @@ export class Issuer {
             }
         }
 
-        return new BatchedTokenResponse(tokenResponses);
+        return new GenericBatchTokenResponse(tokenResponses);
     }
 
     tokenKeyIDs(tokenType: 1 | 2): Promise<Uint8Array[]> {
@@ -298,7 +304,7 @@ export class Client {
         return new BatchedTokenRequest(tokenRequests);
     }
 
-    deserializeTokenResponse(bytes: Uint8Array): BatchedTokenResponse {
-        return BatchedTokenResponse.deserialize(bytes);
+    deserializeTokenResponse(bytes: Uint8Array): GenericBatchTokenResponse {
+        return GenericBatchTokenResponse.deserialize(bytes);
     }
 }

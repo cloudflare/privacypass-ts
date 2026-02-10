@@ -3,7 +3,7 @@
 
 import { webcrypto } from 'node:crypto';
 
-import { arbitraryBatchedTokens } from './arbitrary_batched.example.js';
+import { genericBatchedTokens } from './generic_batched.example.js';
 import { publicVerifiableTokensPSS, publicVerifiableTokensPSSZero } from './pub_verif.example.js';
 import {
     publicVerifiableWithMetadataTokensPSS,
@@ -23,7 +23,7 @@ async function isOk(fn: () => Promise<boolean>) {
 }
 
 async function examples() {
-    await isOk(arbitraryBatchedTokens);
+    await isOk(genericBatchedTokens);
     await isOk(privateVerifiableTokens);
     await isOk(publicVerifiableTokensPSS);
     await isOk(publicVerifiableTokensPSSZero);
