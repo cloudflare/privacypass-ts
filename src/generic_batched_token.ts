@@ -3,6 +3,7 @@
 
 import * as varint from 'quicvarint';
 
+import type { privateVerif, publicVerif } from './index.js';
 import {
     type Token,
     TOKEN_TYPES,
@@ -10,7 +11,11 @@ import {
     tokenRequestToTokenTypeEntry,
 } from './index.js';
 import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv_verif_token.js';
-import { Issuer as Type2Issuer, TokenRequest as Type2TokenRequest } from './pub_verif_token.js';
+import {
+    TokenResponse,
+    Issuer as Type2Issuer,
+    TokenRequest as Type2TokenRequest,
+} from './pub_verif_token.js';
 import { joinAll } from './util.js';
 
 const TokenStatus = {
@@ -130,9 +135,14 @@ export class OptionalTokenResponse {
     // struct {
     //     optional<GenericTokenResponse> generic_token_response; /* Defined by token_type */
     // } OptionalTokenResponse;
-    constructor(public readonly tokenResponse: null | Uint8Array) {}
+    constructor(
+        public readonly tokenResponse:
+            | null
+            | publicVerif.TokenResponse
+            | privateVerif.TokenResponse,
+    ) {}
 
-    static deserialize(bytes: Uint8Array): OptionalTokenResponse {
+    static deserialize(bytes: Uint8Array, type: 1 | 2): OptionalTokenResponse {
         if (bytes.length === 0) {
             throw new Error('OptionalTokenResponse MUST be of length strictly greater than 0');
         }
@@ -140,7 +150,14 @@ export class OptionalTokenResponse {
             case TokenStatus.ABSENT:
                 return new OptionalTokenResponse(null);
             case TokenStatus.PRESENT:
-                return new OptionalTokenResponse(bytes.slice(1));
+                switch (type) {
+                    case TOKEN_TYPES.VOPRF.value:
+                        return new OptionalTokenResponse(TokenResponse.deserialize(bytes.slice(1)));
+                    case TOKEN_TYPES.BLIND_RSA.value:
+                        return new OptionalTokenResponse(TokenResponse.deserialize(bytes.slice(1)));
+                    default:
+                        throw new Error('unsupported token type');
+                }
             default:
                 throw new Error('OptionalTokenResponse MUST start with either 0x00 or 0x01');
         }
@@ -150,7 +167,8 @@ export class OptionalTokenResponse {
         if (this.tokenResponse === null) {
             return new Uint8Array([TokenStatus.ABSENT]);
         }
-        return new Uint8Array([TokenStatus.PRESENT, ...this.tokenResponse]);
+        const serialized = this.tokenResponse.serialize();
+        return new Uint8Array([TokenStatus.PRESENT, ...serialized]);
     }
 }
 
@@ -160,7 +178,7 @@ export class GenericBatchTokenResponse {
     // } GenericBatchTokenResponse
     constructor(public readonly tokenResponses: OptionalTokenResponse[]) {}
 
-    static deserialize(bytes: Uint8Array): GenericBatchTokenResponse {
+    static deserialize(bytes: Uint8Array, types: (1 | 2)[]): GenericBatchTokenResponse {
         let offset = 0;
         const input = new DataView(bytes.buffer);
 
@@ -173,13 +191,16 @@ export class GenericBatchTokenResponse {
 
         const batchedTokenResponses: OptionalTokenResponse[] = [];
 
+        let i = 0;
         while (offset < bytes.length) {
-            const len = input.getUint16(offset);
-            offset += 2;
-            const b = new Uint8Array(input.buffer.slice(offset, offset + len));
-            offset += len;
-
-            batchedTokenResponses.push(OptionalTokenResponse.deserialize(b));
+            const type = types[i++];
+            const otr = OptionalTokenResponse.deserialize(bytes.slice(offset), type);
+            if (otr.tokenResponse === null) {
+                offset += 1;
+            } else {
+                offset += otr.tokenResponse.length() + 1;
+            }
+            batchedTokenResponses.push(otr);
         }
 
         return new GenericBatchTokenResponse(batchedTokenResponses);
@@ -261,9 +282,10 @@ export class Issuer {
                     tokenRequest.truncatedTokenKeyId,
                 );
                 const response = (await issuer.issue(tokenRequest.tokenRequest)).serialize();
-                tokenResponses.push(new OptionalTokenResponse(response));
+                tokenResponses.push(new OptionalTokenResponse(TokenResponse.deserialize(response)));
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            } catch (_) {
+            } catch (e) {
+                console.log(e);
                 tokenResponses.push(new OptionalTokenResponse(null));
             }
         }
@@ -304,7 +326,7 @@ export class Client {
         return new BatchedTokenRequest(tokenRequests);
     }
 
-    deserializeTokenResponse(bytes: Uint8Array): GenericBatchTokenResponse {
-        return GenericBatchTokenResponse.deserialize(bytes);
+    deserializeTokenResponse(bytes: Uint8Array, types: (1 | 2)[]): GenericBatchTokenResponse {
+        return GenericBatchTokenResponse.deserialize(bytes, types);
     }
 }

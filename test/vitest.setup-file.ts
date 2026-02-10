@@ -50,17 +50,19 @@ async function mockImportKey(
     keyData: JsonWebKey | BufferSource,
     algorithm: AlgorithmIdentifier,
     extractable: boolean,
-    keyUsages: KeyUsage[],
+    keyUsages: readonly KeyUsage[],
 ): Promise<CryptoKey> {
-    crypto.subtle.importKey = parentImportKey;
+    crypto.subtle.importKey = parentImportKey as typeof crypto.subtle.importKey;
     try {
+        // Convert readonly array to mutable array for crypto API
+        const mutableKeyUsages = [...keyUsages];
         if (format === 'jwk') {
             return await crypto.subtle.importKey(
                 format,
                 keyData as JsonWebKey,
                 algorithm,
                 extractable,
-                keyUsages,
+                mutableKeyUsages,
             );
         }
         const data: BufferSource = keyData as BufferSource;
@@ -78,14 +80,20 @@ async function mockImportKey(
                 data,
                 algorithm,
                 extractable,
-                keyUsages,
+                mutableKeyUsages,
             );
             key.algorithm.name = 'RSA-RAW';
             return key;
         }
-        return await crypto.subtle.importKey(format, data, algorithm, extractable, keyUsages);
+        return await crypto.subtle.importKey(
+            format,
+            data,
+            algorithm,
+            extractable,
+            mutableKeyUsages,
+        );
     } finally {
-        crypto.subtle.importKey = mockImportKey;
+        crypto.subtle.importKey = mockImportKey as typeof crypto.subtle.importKey;
     }
 }
 crypto.subtle.importKey = mockImportKey;

@@ -163,6 +163,10 @@ export class TokenResponse {
     serialize(): Uint8Array {
         return new Uint8Array(joinAll([this.evaluateMsg, this.evaluateProof]));
     }
+
+    length(): number {
+        return this.evaluateMsg.length + this.evaluateProof.length;
+    }
 }
 
 export function verifyToken(token: Token, privateKeyIssuer: Uint8Array): Promise<boolean> {

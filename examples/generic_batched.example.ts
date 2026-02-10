@@ -82,8 +82,8 @@ async function rsaVariant(): Promise<boolean> {
         if (res.tokenResponse === null) {
             continue;
         }
-        const r = publicVerif.TokenResponse.deserialize(res.tokenResponse);
-        tokens[i] = await clients[i].finalize(r);
+        const r = res.tokenResponse;
+        tokens[i] = await clients[i].finalize(r as publicVerif.TokenResponse);
 
         i += 1;
     }
