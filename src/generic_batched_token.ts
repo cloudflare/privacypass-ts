@@ -82,7 +82,7 @@ export class BatchedTokenRequest {
 
     static deserialize(bytes: Uint8Array): BatchedTokenRequest {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
         const { value: length, usize } = varint.read(input, offset);
         offset += usize;
@@ -94,9 +94,9 @@ export class BatchedTokenRequest {
         const batchedTokenRequests: TokenRequest[] = [];
 
         while (offset < bytes.length) {
-            const tokenTypeEntry = tokenRequestToTokenTypeEntry(bytes);
+            const tokenTypeEntry = tokenRequestToTokenTypeEntry(bytes.subarray(offset));
             const len = tokenEntryToSerializedLength(tokenTypeEntry);
-            const b = new Uint8Array(input.buffer.slice(offset, offset + len));
+            const b = bytes.subarray(offset, offset + len);
             offset += len;
 
             batchedTokenRequests.push(TokenRequest.deserialize(b));
@@ -111,7 +111,12 @@ export class BatchedTokenRequest {
         let length = 0;
         for (const tokenRequest of this.tokenRequests) {
             const tokenRequestSerialized = tokenRequest.serialize();
-            output.push(tokenRequestSerialized.buffer);
+            output.push(
+                (tokenRequestSerialized.buffer as ArrayBuffer).slice(
+                    tokenRequestSerialized.byteOffset,
+                    tokenRequestSerialized.byteOffset + tokenRequestSerialized.byteLength,
+                ),
+            );
             length += tokenRequestSerialized.length;
         }
 
@@ -217,7 +222,7 @@ export class GenericBatchTokenResponse {
 
     static deserialize(bytes: Uint8Array): GenericBatchTokenResponse {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
         const { value: length, usize } = varint.read(input, offset);
         offset += usize;
@@ -229,7 +234,7 @@ export class GenericBatchTokenResponse {
         const batchedTokenResponses: OptionalTokenResponse[] = [];
 
         while (offset < bytes.length) {
-            const otr = OptionalTokenResponse.deserialize(bytes.slice(offset));
+            const otr = OptionalTokenResponse.deserialize(bytes.subarray(offset));
             offset += otr.length();
             batchedTokenResponses.push(otr);
         }
@@ -244,7 +249,12 @@ export class GenericBatchTokenResponse {
         for (const tokenResponse of this.tokenResponses) {
             const tokenResponseSerialized = tokenResponse.serialize();
 
-            output.push(tokenResponseSerialized);
+            output.push(
+                (tokenResponseSerialized.buffer as ArrayBuffer).slice(
+                    tokenResponseSerialized.byteOffset,
+                    tokenResponseSerialized.byteOffset + tokenResponseSerialized.byteLength,
+                ),
+            );
             length += tokenResponseSerialized.length;
         }
 
