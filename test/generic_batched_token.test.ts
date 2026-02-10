@@ -134,15 +134,10 @@ describe.each(vectors)('GenericBatched-Vector-%#', (v: Vectors) => {
 
         const issuer = new Issuer(...issuers);
 
-        console.log(tokReq);
         const tokRes = await issuer.issue(tokReq);
         const bytes = tokRes.serialize();
-        const got = GenericBatchTokenResponse.deserialize(
-            bytes,
-            tokReq.tokenRequests.map((r) => r.tokenType) as (1 | 2)[],
-        );
+        const got = GenericBatchTokenResponse.deserialize(bytes);
         expect(got).toStrictEqual(tokRes);
-        console.log(tokRes);
 
         for (let i = 0; i < v.issuance.length; i += 1) {
             const issuance = v.issuance[i];

@@ -10,9 +10,13 @@ import {
     tokenEntryToSerializedLength,
     tokenRequestToTokenTypeEntry,
 } from './index.js';
-import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv_verif_token.js';
 import {
-    TokenResponse,
+    Issuer as Type1Issuer,
+    TokenRequest as Type1TokenRequest,
+    TokenResponse as Type1TokenResponse,
+} from './priv_verif_token.js';
+import {
+    TokenResponse as Type2TokenResponse,
     Issuer as Type2Issuer,
     TokenRequest as Type2TokenRequest,
 } from './pub_verif_token.js';
@@ -133,31 +137,50 @@ export class BatchedTokenRequest {
 
 export class OptionalTokenResponse {
     // struct {
-    //     optional<GenericTokenResponse> generic_token_response; /* Defined by token_type */
+    //     uint8 present;
+    //     select (present) {
+    //         case 0: ; /* empty */
+    //         case 1:
+    //             uint16 token_type;
+    //             GenericTokenResponse generic_token_response; /* Defined by token_type */
+    //     }
     // } OptionalTokenResponse;
     constructor(
+        public readonly tokenType: 1 | 2,
         public readonly tokenResponse:
             | null
             | publicVerif.TokenResponse
             | privateVerif.TokenResponse,
     ) {}
 
-    static deserialize(bytes: Uint8Array, type: 1 | 2): OptionalTokenResponse {
+    static deserialize(bytes: Uint8Array): OptionalTokenResponse {
         if (bytes.length === 0) {
             throw new Error('OptionalTokenResponse MUST be of length strictly greater than 0');
         }
         switch (bytes[0]) {
             case TokenStatus.ABSENT:
-                return new OptionalTokenResponse(null);
-            case TokenStatus.PRESENT:
-                switch (type) {
-                    case TOKEN_TYPES.VOPRF.value:
-                        return new OptionalTokenResponse(TokenResponse.deserialize(bytes.slice(1)));
-                    case TOKEN_TYPES.BLIND_RSA.value:
-                        return new OptionalTokenResponse(TokenResponse.deserialize(bytes.slice(1)));
-                    default:
-                        throw new Error('unsupported token type');
+                // For absent responses, we still need a token type but it doesn't matter
+                // We use 1 as a placeholder since the response is null
+                return new OptionalTokenResponse(1, null);
+            case TokenStatus.PRESENT: {
+                if (bytes.length < 3) {
+                    throw new Error('OptionalTokenResponse PRESENT requires at least 3 bytes');
                 }
+                // Parse token_type from bytes[1:3] big-endian
+                const tokenType = (bytes[1] << 8) | bytes[2];
+                if (
+                    tokenType !== TOKEN_TYPES.VOPRF.value &&
+                    tokenType !== TOKEN_TYPES.BLIND_RSA.value
+                ) {
+                    throw new Error(`unsupported token type: ${tokenType}`);
+                }
+                const responseBytes = bytes.slice(3);
+                const response =
+                    tokenType === TOKEN_TYPES.VOPRF.value
+                        ? Type1TokenResponse.deserialize(responseBytes)
+                        : Type2TokenResponse.deserialize(responseBytes);
+                return new OptionalTokenResponse(tokenType as 1 | 2, response);
+            }
             default:
                 throw new Error('OptionalTokenResponse MUST start with either 0x00 or 0x01');
         }
@@ -168,7 +191,21 @@ export class OptionalTokenResponse {
             return new Uint8Array([TokenStatus.ABSENT]);
         }
         const serialized = this.tokenResponse.serialize();
-        return new Uint8Array([TokenStatus.PRESENT, ...serialized]);
+        // Format: [present:1][token_type:2 big-endian][response_data]
+        const result = new Uint8Array(1 + 2 + serialized.length);
+        result[0] = TokenStatus.PRESENT;
+        result[1] = (this.tokenType >> 8) & 0xff;
+        result[2] = this.tokenType & 0xff;
+        result.set(serialized, 3);
+        return result;
+    }
+
+    /** Returns the serialized length of this response */
+    length(): number {
+        if (this.tokenResponse === null) {
+            return 1; // just the ABSENT byte
+        }
+        return 1 + 2 + this.tokenResponse.length(); // present + token_type + response
     }
 }
 
@@ -178,7 +215,7 @@ export class GenericBatchTokenResponse {
     // } GenericBatchTokenResponse
     constructor(public readonly tokenResponses: OptionalTokenResponse[]) {}
 
-    static deserialize(bytes: Uint8Array, types: (1 | 2)[]): GenericBatchTokenResponse {
+    static deserialize(bytes: Uint8Array): GenericBatchTokenResponse {
         let offset = 0;
         const input = new DataView(bytes.buffer);
 
@@ -191,15 +228,9 @@ export class GenericBatchTokenResponse {
 
         const batchedTokenResponses: OptionalTokenResponse[] = [];
 
-        let i = 0;
         while (offset < bytes.length) {
-            const type = types[i++];
-            const otr = OptionalTokenResponse.deserialize(bytes.slice(offset), type);
-            if (otr.tokenResponse === null) {
-                offset += 1;
-            } else {
-                offset += otr.tokenResponse.length() + 1;
-            }
+            const otr = OptionalTokenResponse.deserialize(bytes.slice(offset));
+            offset += otr.length();
             batchedTokenResponses.push(otr);
         }
 
@@ -276,17 +307,15 @@ export class Issuer {
     async issue(tokenRequests: BatchedTokenRequest): Promise<GenericBatchTokenResponse> {
         const tokenResponses: OptionalTokenResponse[] = [];
         for (const tokenRequest of tokenRequests) {
+            const tokenType = tokenRequest.tokenType as 1 | 2;
             try {
-                const issuer = await this.issuer(
-                    tokenRequest.tokenType,
-                    tokenRequest.truncatedTokenKeyId,
-                );
-                const response = (await issuer.issue(tokenRequest.tokenRequest)).serialize();
-                tokenResponses.push(new OptionalTokenResponse(TokenResponse.deserialize(response)));
+                const issuer = await this.issuer(tokenType, tokenRequest.truncatedTokenKeyId);
+                const response = await issuer.issue(tokenRequest.tokenRequest);
+                tokenResponses.push(new OptionalTokenResponse(tokenType, response));
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
                 console.log(e);
-                tokenResponses.push(new OptionalTokenResponse(null));
+                tokenResponses.push(new OptionalTokenResponse(tokenType, null));
             }
         }
 
@@ -326,7 +355,7 @@ export class Client {
         return new BatchedTokenRequest(tokenRequests);
     }
 
-    deserializeTokenResponse(bytes: Uint8Array, types: (1 | 2)[]): GenericBatchTokenResponse {
-        return GenericBatchTokenResponse.deserialize(bytes, types);
+    deserializeTokenResponse(bytes: Uint8Array): GenericBatchTokenResponse {
+        return GenericBatchTokenResponse.deserialize(bytes);
     }
 }
