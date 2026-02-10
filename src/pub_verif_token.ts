@@ -200,7 +200,7 @@ export class TokenResponse {
 
     constructor(public readonly blindSig: Uint8Array) {
         if (blindSig.length !== BLIND_RSA.Nk) {
-            throw new Error('blind signature has invalid size');
+            throw new Error(`blind signature has invalid size: ${blindSig.length}`);
         }
     }
 
@@ -210,6 +210,10 @@ export class TokenResponse {
 
     serialize(): Uint8Array {
         return new Uint8Array(this.blindSig);
+    }
+
+    length(): number {
+        return this.blindSig.length;
     }
 }
 

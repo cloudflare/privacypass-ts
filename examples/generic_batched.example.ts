@@ -3,10 +3,10 @@
 
 /* eslint-disable security/detect-object-injection */
 
-import { TokenRequest } from '../src/arbitrary_batched_token.js';
-import { type Token, type TokenChallenge, arbitraryBatched, publicVerif } from '../src/index.js';
+import { TokenRequest } from '../src/generic_batched_token.js';
+import { type Token, type TokenChallenge, genericBatched, publicVerif } from '../src/index.js';
 type BlindRSAMode = publicVerif.BlindRSAMode;
-const { Client, Issuer } = arbitraryBatched;
+const { Client, Issuer } = genericBatched;
 
 async function setupPublicVerif(mode: BlindRSAMode) {
     // [ Issuer ] creates a key pair.
@@ -82,8 +82,8 @@ async function rsaVariant(): Promise<boolean> {
         if (res.tokenResponse === null) {
             continue;
         }
-        const r = publicVerif.TokenResponse.deserialize(res.tokenResponse);
-        tokens[i] = await clients[i].finalize(r);
+        const r = res.tokenResponse;
+        tokens[i] = await clients[i].finalize(r as publicVerif.TokenResponse);
 
         i += 1;
     }
@@ -95,11 +95,11 @@ async function rsaVariant(): Promise<boolean> {
         isValid &&= token !== undefined && (await origins[i].verify(token, issuers[i].publicKey));
     }
 
-    console.log('Arbitrary batched tokens');
+    console.log('Generic batched tokens');
     console.log(`    Valid token: ${isValid}`);
     return isValid;
 }
 
-export function arbitraryBatchedTokens(): Promise<boolean> {
+export function genericBatchedTokens(): Promise<boolean> {
     return rsaVariant();
 }
