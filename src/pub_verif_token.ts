@@ -126,7 +126,7 @@ export class TokenRequest {
 
     static deserialize(tokenType: TokenTypeEntry, bytes: Uint8Array): TokenRequest {
         let offset = 0;
-        const input = new DataView(bytes.buffer);
+        const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
         const type = input.getUint16(offset);
         offset += 2;
@@ -139,7 +139,7 @@ export class TokenRequest {
         offset += 1;
 
         const len = tokenType.Nk;
-        const blindedMsg = new Uint8Array(input.buffer.slice(offset, offset + len));
+        const blindedMsg = bytes.subarray(offset, offset + len);
         offset += len;
 
         return new TokenRequest(tokenKeyId, blindedMsg, tokenType);
@@ -156,7 +156,10 @@ export class TokenRequest {
         new DataView(b).setUint8(0, this.truncatedTokenKeyId);
         output.push(b);
 
-        b = this.blindedMsg.buffer;
+        b = (this.blindedMsg.buffer as ArrayBuffer).slice(
+            this.blindedMsg.byteOffset,
+            this.blindedMsg.byteOffset + this.blindedMsg.byteLength,
+        );
         output.push(b);
 
         return new Uint8Array(joinAll(output));
@@ -184,10 +187,20 @@ export class ExtendedTokenRequest {
         const output = new Array<ArrayBuffer>();
 
         const request = this.request.serialize();
-        output.push(request.buffer);
+        output.push(
+            (request.buffer as ArrayBuffer).slice(
+                request.byteOffset,
+                request.byteOffset + request.byteLength,
+            ),
+        );
 
         const extensions = this.extensions.serialize();
-        output.push(extensions.buffer);
+        output.push(
+            (extensions.buffer as ArrayBuffer).slice(
+                extensions.byteOffset,
+                extensions.byteOffset + extensions.byteLength,
+            ),
+        );
 
         return new Uint8Array(joinAll(output));
     }

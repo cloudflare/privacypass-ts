@@ -85,13 +85,15 @@ export async function header_to_token(header: string): Promise<string | null> {
 }
 
 export function tokenEntryToSerializedLength(tokenType: TokenTypeEntry): number {
+    // TokenRequest structure: 2-byte token_type + 1-byte truncated_token_key_id + blinded_msg
+    const headerLen = 3; // token_type (2) + truncated_token_key_id (1)
     switch (tokenType.value) {
         case TOKEN_TYPES.VOPRF.value:
-            return VOPRF.Ne + 2 * VOPRF.Nk;
+            return headerLen + VOPRF.Ne;
         case TOKEN_TYPES.BLIND_RSA.value:
-            return BLIND_RSA.Nk;
+            return headerLen + BLIND_RSA.Nk;
         case TOKEN_TYPES.PARTIALLY_BLIND_RSA.value:
-            return PARTIALLY_BLIND_RSA.Nk;
+            return headerLen + PARTIALLY_BLIND_RSA.Nk;
         default:
             throw new Error(`unrecognized or non-supported token type: ${tokenType.value}`);
     }
@@ -99,7 +101,7 @@ export function tokenEntryToSerializedLength(tokenType: TokenTypeEntry): number 
 
 export function tokenRequestToTokenTypeEntry(bytes: Uint8Array): TokenTypeEntry {
     // All token requests have a 2-byte value at the beginning of the token describing TokenTypeEntry.
-    const input = new DataView(bytes.buffer);
+    const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
     const type = input.getUint16(0);
     const tokenType = Object.values(TOKEN_TYPES).find((t) => t.value === type);
