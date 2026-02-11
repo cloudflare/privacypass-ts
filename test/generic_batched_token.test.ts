@@ -132,6 +132,20 @@ describe.each(vectors)('GenericBatched-Vector-%#', (v: Vectors) => {
         const tokReqSer = tokReq.serialize();
         expect(uint8ToHex(tokReqSer)).toBe(v.token_request);
 
+        // check BatchedTokenRequest deserialization.
+        const token_request_bytes = hexToUint8(v.token_request);
+        const tokReqGot = BatchedTokenRequest.deserialize(token_request_bytes);
+        expect(tokReq.tokenRequests.length).toBe(tokReqGot.tokenRequests.length);
+        for (let i = 0; i < tokReq.tokenRequests.length; i += 1) {
+            expect(tokReq.tokenRequests[i].tokenType).toBe(tokReqGot.tokenRequests[i].tokenType);
+            expect(tokReq.tokenRequests[i].truncatedTokenKeyId).toBe(
+                tokReqGot.tokenRequests[i].truncatedTokenKeyId,
+            );
+            expect(tokReq.tokenRequests[i].blindMsg).toStrictEqual(
+                tokReqGot.tokenRequests[i].blindMsg,
+            );
+        }
+
         const issuer = new Issuer(...issuers);
 
         const tokRes = await issuer.issue(tokReq);
