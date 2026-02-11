@@ -1,6 +1,6 @@
 {
     "name": "@cloudflare/privacypass-ts",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "privacypass-ts: A TypeScript Library for the Privacy Pass Issuance Protocol",
     "author": "Armando Faz <armfazh@cloudflare.com>",
     "contributors": [
