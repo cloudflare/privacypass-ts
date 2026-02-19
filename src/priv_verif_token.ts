@@ -20,8 +20,10 @@ import {
     Token,
     TokenChallenge,
     type TokenTypeEntry,
+    type TokenTypeValue,
 } from './auth_scheme/private_token.js';
 import { joinAll } from './util.js';
+import { TOKEN_TYPES } from './index.js';
 
 export interface VOPRFExtraParams {
     suite: SuiteID;
@@ -79,7 +81,7 @@ export class TokenRequest {
     //     uint8_t blinded_msg[Ne];
     //   } TokenRequest;
 
-    tokenType: number;
+    public readonly tokenType: TokenTypeValue = VOPRF.value;
     constructor(
         public readonly truncatedTokenKeyId: number,
         public readonly blindedMsg: Uint8Array,
@@ -87,8 +89,6 @@ export class TokenRequest {
         if (blindedMsg.length !== VOPRF.Ne) {
             throw new Error('blinded message has invalid size');
         }
-
-        this.tokenType = VOPRF.value;
     }
 
     static deserialize(bytes: Uint8Array): TokenRequest {
@@ -138,6 +138,8 @@ export class TokenResponse {
     //     uint8_t evaluate_msg[Ne];
     //     uint8_t evaluate_proof[Ns+Ns];
     //  } TokenResponse;
+
+    public readonly tokenType: number = TOKEN_TYPES.VOPRF.value;
 
     constructor(
         public readonly evaluateMsg: Uint8Array,

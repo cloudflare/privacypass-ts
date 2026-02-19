@@ -32,9 +32,11 @@ import { joinAll } from '../util.js';
 const MAX_UINT16 = (1 << 16) - 1;
 export const AUTH_SCHEME_NAME = 'PrivateToken';
 
+export type TokenTypeValue = 0x0001 | 0x0002 | 0xda7a;
+
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-auth-scheme-14#name-token-type-registry
 export interface TokenTypeEntry {
-    value: number;
+    value: TokenTypeValue;
     name: string;
     publicVerifiable: boolean;
     publicMetadata: boolean;
@@ -170,7 +172,7 @@ export class AuthenticatorInput {
 
     constructor(
         tokenTypeEntry: TokenTypeEntry,
-        public readonly tokenType: number,
+        public readonly tokenType: TokenTypeValue,
         public readonly nonce: Uint8Array,
         public readonly challengeDigest: Uint8Array,
         public readonly tokenKeyId: Uint8Array,
@@ -203,6 +205,9 @@ export class AuthenticatorInput {
         const input = new DataView(bytes.buffer);
 
         const type = input.getUint16(offset);
+        if (type !== 0x0001 && type !== 0x0002 && type !== 0xda7a) {
+            throw new Error(`invalid token type: ${type}`);
+        }
         offset += 2;
 
         let len = AuthenticatorInput.NONCE_LENGTH;

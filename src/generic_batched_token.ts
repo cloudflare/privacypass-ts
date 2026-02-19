@@ -3,23 +3,15 @@
 
 import * as varint from 'quicvarint';
 
-import type { privateVerif, publicVerif } from './index.js';
+import { publicVerif, privateVerif, type TokenTypeValue } from './index.js';
 import {
     type Token,
     TOKEN_TYPES,
     tokenEntryToSerializedLength,
     tokenRequestToTokenTypeEntry,
 } from './index.js';
-import {
-    Issuer as Type1Issuer,
-    TokenRequest as Type1TokenRequest,
-    TokenResponse as Type1TokenResponse,
-} from './priv_verif_token.js';
-import {
-    TokenResponse as Type2TokenResponse,
-    Issuer as Type2Issuer,
-    TokenRequest as Type2TokenRequest,
-} from './pub_verif_token.js';
+import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv_verif_token.js';
+import { Issuer as Type2Issuer, TokenRequest as Type2TokenRequest } from './pub_verif_token.js';
 import { joinAll } from './util.js';
 
 const TokenStatus = {
@@ -60,7 +52,7 @@ export class TokenRequest {
         return this.tokenRequest.serialize();
     }
 
-    get tokenType(): number {
+    get tokenType(): TokenTypeValue {
         return this.tokenRequest.tokenType;
     }
 
@@ -151,7 +143,6 @@ export class OptionalTokenResponse {
     //     }
     // } OptionalTokenResponse;
     constructor(
-        public readonly tokenType: 1 | 2,
         public readonly tokenResponse:
             | null
             | publicVerif.TokenResponse
@@ -166,7 +157,7 @@ export class OptionalTokenResponse {
             case TokenStatus.ABSENT:
                 // For absent responses, we still need a token type but it doesn't matter
                 // We use 1 as a placeholder since the response is null
-                return new OptionalTokenResponse(1, null);
+                return new OptionalTokenResponse(null);
             case TokenStatus.PRESENT: {
                 if (bytes.length < 3) {
                     throw new Error('OptionalTokenResponse PRESENT requires at least 3 bytes');
@@ -182,9 +173,9 @@ export class OptionalTokenResponse {
                 const responseBytes = bytes.slice(3);
                 const response =
                     tokenType === TOKEN_TYPES.VOPRF.value
-                        ? Type1TokenResponse.deserialize(responseBytes)
-                        : Type2TokenResponse.deserialize(responseBytes);
-                return new OptionalTokenResponse(tokenType as 1 | 2, response);
+                        ? privateVerif.TokenResponse.deserialize(responseBytes)
+                        : publicVerif.TokenResponse.deserialize(responseBytes);
+                return new OptionalTokenResponse(response);
             }
             default:
                 throw new Error('OptionalTokenResponse MUST start with either 0x00 or 0x01');
@@ -199,8 +190,8 @@ export class OptionalTokenResponse {
         // Format: [present:1][token_type:2 big-endian][response_data]
         const result = new Uint8Array(1 + 2 + serialized.length);
         result[0] = TokenStatus.PRESENT;
-        result[1] = (this.tokenType >> 8) & 0xff;
-        result[2] = this.tokenType & 0xff;
+        result[1] = (this.tokenResponse.tokenType >> 8) & 0xff;
+        result[2] = this.tokenResponse.tokenType & 0xff;
         result.set(serialized, 3);
         return result;
     }
@@ -294,7 +285,7 @@ export class Issuer {
     }
 
     private async issuer(
-        tokenType: number,
+        tokenType: TokenTypeValue,
         truncatedTokenKeyId: number,
     ): Promise<Type1Issuer | Type2Issuer> {
         if (![TOKEN_TYPES.VOPRF.value, TOKEN_TYPES.BLIND_RSA.value].includes(tokenType)) {
@@ -321,11 +312,11 @@ export class Issuer {
             try {
                 const issuer = await this.issuer(tokenType, tokenRequest.truncatedTokenKeyId);
                 const response = await issuer.issue(tokenRequest.tokenRequest);
-                tokenResponses.push(new OptionalTokenResponse(tokenType, response));
+                tokenResponses.push(new OptionalTokenResponse(response));
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
                 console.log(e);
-                tokenResponses.push(new OptionalTokenResponse(tokenType, null));
+                tokenResponses.push(new OptionalTokenResponse(null));
             }
         }
 
