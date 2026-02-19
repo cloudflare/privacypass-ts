@@ -16,6 +16,7 @@ import {
     Token,
     TokenChallenge,
     type TokenTypeEntry,
+    type TokenTypeValue,
 } from './auth_scheme/private_token.js';
 
 export enum BlindRSAMode {
@@ -24,6 +25,7 @@ export enum BlindRSAMode {
 }
 
 export import PartiallyBlindRSAMode = BlindRSAMode;
+import { TOKEN_TYPES } from './index.js';
 
 export interface BlindRSAExtraParams {
     suite: Record<BlindRSAMode, (params?: BlindRSAPlatformParams) => BlindRSA>;
@@ -111,7 +113,7 @@ export class TokenRequest {
     //     uint8_t blinded_msg[Nk];
     // } TokenRequest;
 
-    tokenType: number;
+    public readonly tokenType: TokenTypeValue;
     constructor(
         public readonly truncatedTokenKeyId: number,
         public readonly blindedMsg: Uint8Array,
@@ -210,6 +212,8 @@ export class TokenResponse {
     // struct {
     //     uint8_t blind_sig[Nk];
     // } TokenResponse;
+
+    public readonly tokenType: number = TOKEN_TYPES.BLIND_RSA.value;
 
     constructor(public readonly blindSig: Uint8Array) {
         if (blindSig.length !== BLIND_RSA.Nk) {
