@@ -74,20 +74,6 @@ class TokenRequest {
 }
 ```
 
-### Binary Protocol Handling
-
-Use `DataView` for multi-byte integers. Always account for `byteOffset` when working with subarrays:
-
-```typescript
-// CORRECT: handles subarrays properly
-const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-const value = input.getUint16(0);
-
-// WRONG: ignores subarray offset, reads wrong data
-const input = new DataView(bytes.buffer);
-```
-
-This was a real bug (fixed in f00a7fc). When `bytes` is a subarray of a larger buffer, `bytes.buffer` points to the entire underlying ArrayBuffer, not just the slice.
 
 ### Role Classes
 
