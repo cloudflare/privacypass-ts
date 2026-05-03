@@ -13,7 +13,7 @@ const parentSign = webcrypto.subtle.sign;
 async function mockSign(
     algorithm: AlgorithmIdentifier | RsaPssParams | EcdsaParams,
     key: CryptoKey,
-    data: Uint8Array,
+    data: ArrayBuffer,
 ): Promise<ArrayBuffer> {
     if (
         algorithm === 'RSA-RAW' ||
@@ -25,7 +25,9 @@ async function mockSign(
         }
         key.algorithm.name = 'RSA-PSS';
         try {
-            return await RSABSSA.SHA384.PSSZero.Deterministic().blindSign(key, data);
+            const data_u8 = new Uint8Array(data);
+            const blindSig = await RSABSSA.SHA384.PSSZero.Deterministic().blindSign(key, data_u8);
+            return blindSig.slice().buffer;
         } finally {
             key.algorithm.name = algorithmName;
         }
