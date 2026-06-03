@@ -13,7 +13,7 @@ const parentSign = webcrypto.subtle.sign;
 async function mockSign(
     algorithm: AlgorithmIdentifier | RsaPssParams | EcdsaParams,
     key: CryptoKey,
-    data: Uint8Array,
+    data: ArrayBuffer,
 ): Promise<ArrayBuffer> {
     if (
         algorithm === 'RSA-RAW' ||
@@ -25,7 +25,11 @@ async function mockSign(
         }
         key.algorithm.name = 'RSA-PSS';
         try {
-            return await RSABSSA.SHA384.PSSZero.Deterministic().blindSign(key, data);
+            const blindSig = await RSABSSA.SHA384.PSSZero.Deterministic().blindSign(
+                key,
+                new Uint8Array(data),
+            );
+            return blindSig.slice().buffer;
         } finally {
             key.algorithm.name = algorithmName;
         }
@@ -34,7 +38,9 @@ async function mockSign(
     // webcrypto calls crypto, which is mocked. We need to restore the original implementation.
     crypto.subtle.sign = parentSign;
     const res = webcrypto.subtle.sign(algorithm, key, data);
-    crypto.subtle.sign = mockSign;
+    await res.finally(() => {
+        crypto.subtle.sign = mockSign;
+    });
     return res;
 }
 
