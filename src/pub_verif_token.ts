@@ -9,7 +9,8 @@ import {
     RSAPBSSA,
 } from '@cloudflare/blindrsa-ts';
 
-import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc, joinAll } from './util.js';
+import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './rsa_util.js';
+import { joinAll } from './util.js';
 import {
     AuthenticatorInput,
     Extensions,
@@ -18,6 +19,7 @@ import {
     type TokenTypeEntry,
     type TokenTypeValue,
 } from './auth_scheme/private_token.js';
+import { BLIND_RSA_TOKEN_TYPE, PARTIALLY_BLIND_RSA_TOKEN_TYPE } from './token_types.js';
 
 export enum BlindRSAMode {
     PSSZero = 0, // Corresponds to RSASSA.SHA384.PSSZero.Deterministic
@@ -25,7 +27,7 @@ export enum BlindRSAMode {
 }
 
 export import PartiallyBlindRSAMode = BlindRSAMode;
-import { TOKEN_TYPES } from './index.js';
+export { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './rsa_util.js';
 
 export interface BlindRSAExtraParams {
     suite: Record<BlindRSAMode, (params?: BlindRSAPlatformParams) => BlindRSA>;
@@ -66,25 +68,13 @@ const PARTIALLY_BLINDRSA_EXTRA_PARAMS: PartiallyBlindRSAExtraParams = {
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-blind-rsa-2048-b',
 // https://datatracker.ietf.org/doc/html/draft-hendrickson-privacypass-public-metadata-03#section-8.2
 export const BLIND_RSA: Readonly<TokenTypeEntry> & BlindRSAExtraParams = {
-    value: 0x0002,
-    name: 'Blind RSA (2048)',
-    Nk: 256,
-    Nid: 32,
-    publicVerifiable: true,
-    publicMetadata: false,
-    privateMetadata: false,
+    ...BLIND_RSA_TOKEN_TYPE,
     ...BLINDRSA_EXTRA_PARAMS,
 } as const;
 type BlindRSAType = typeof BLIND_RSA;
 
 export const PARTIALLY_BLIND_RSA: Readonly<TokenTypeEntry> & PartiallyBlindRSAExtraParams = {
-    value: 0xda7a,
-    name: 'Partially Blind RSA (2048-bit)',
-    Nk: 256,
-    Nid: 32,
-    publicVerifiable: true,
-    publicMetadata: true,
-    privateMetadata: false,
+    ...PARTIALLY_BLIND_RSA_TOKEN_TYPE,
     ...PARTIALLY_BLINDRSA_EXTRA_PARAMS,
 } as const;
 type PartiallyBlindRSAType = typeof PARTIALLY_BLIND_RSA;
@@ -213,7 +203,7 @@ export class TokenResponse {
     //     uint8_t blind_sig[Nk];
     // } TokenResponse;
 
-    public readonly tokenType: number = TOKEN_TYPES.BLIND_RSA.value;
+    public readonly tokenType: number = BLIND_RSA.value;
 
     constructor(public readonly blindSig: Uint8Array) {
         if (blindSig.length !== BLIND_RSA.Nk) {

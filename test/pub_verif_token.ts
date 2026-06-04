@@ -3,7 +3,7 @@
 
 import { base64 } from 'rfc4648';
 
-import { util } from '../src/index.js';
+import { publicVerif } from '../src/index.js';
 
 import { hexToUint8 } from './util.js';
 
@@ -35,7 +35,7 @@ export async function keysFromVector(
         ['sign'],
     );
 
-    const spkiEncoded = util.convertRSASSAPSSToEnc(hexToUint8(v.pkS));
+    const spkiEncoded = publicVerif.convertRSASSAPSSToEnc(hexToUint8(v.pkS));
     const publicKey = await crypto.subtle.importKey(
         'spki',
         spkiEncoded,

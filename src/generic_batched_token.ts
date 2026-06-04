@@ -3,15 +3,22 @@
 
 import * as varint from 'quicvarint';
 
-import { publicVerif, privateVerif, type TokenTypeValue } from './index.js';
 import {
-    type Token,
     TOKEN_TYPES,
     tokenEntryToSerializedLength,
     tokenRequestToTokenTypeEntry,
-} from './index.js';
-import { Issuer as Type1Issuer, TokenRequest as Type1TokenRequest } from './priv_verif_token.js';
-import { Issuer as Type2Issuer, TokenRequest as Type2TokenRequest } from './pub_verif_token.js';
+} from './token_types.js';
+import type { Token, TokenTypeValue } from './auth_scheme/private_token.js';
+import {
+    Issuer as Type1Issuer,
+    TokenRequest as Type1TokenRequest,
+    TokenResponse as Type1TokenResponse,
+} from './priv_verif_token.js';
+import {
+    Issuer as Type2Issuer,
+    TokenRequest as Type2TokenRequest,
+    TokenResponse as Type2TokenResponse,
+} from './pub_verif_token.js';
 import { joinAll } from './util.js';
 
 const TokenStatus = {
@@ -142,12 +149,7 @@ export class OptionalTokenResponse {
     //             GenericTokenResponse generic_token_response; /* Defined by token_type */
     //     }
     // } OptionalTokenResponse;
-    constructor(
-        public readonly tokenResponse:
-            | null
-            | publicVerif.TokenResponse
-            | privateVerif.TokenResponse,
-    ) {}
+    constructor(public readonly tokenResponse: null | Type1TokenResponse | Type2TokenResponse) {}
 
     static deserialize(bytes: Uint8Array): OptionalTokenResponse {
         if (bytes.length === 0) {
@@ -173,8 +175,8 @@ export class OptionalTokenResponse {
                 const responseBytes = bytes.slice(3);
                 const response =
                     tokenType === TOKEN_TYPES.VOPRF.value
-                        ? privateVerif.TokenResponse.deserialize(responseBytes)
-                        : publicVerif.TokenResponse.deserialize(responseBytes);
+                        ? Type1TokenResponse.deserialize(responseBytes)
+                        : Type2TokenResponse.deserialize(responseBytes);
                 return new OptionalTokenResponse(response);
             }
             default:
@@ -288,10 +290,13 @@ export class Issuer {
         tokenType: TokenTypeValue,
         truncatedTokenKeyId: number,
     ): Promise<Type1Issuer | Type2Issuer> {
-        if (![TOKEN_TYPES.VOPRF.value, TOKEN_TYPES.BLIND_RSA.value].includes(tokenType)) {
+        if (tokenType !== TOKEN_TYPES.VOPRF.value && tokenType !== TOKEN_TYPES.BLIND_RSA.value) {
             throw new Error('unsupported token type');
         }
-        const issuers = this.issuers[tokenType as 1 | 2];
+        const issuers =
+            tokenType === TOKEN_TYPES.VOPRF.value
+                ? this.issuers[TOKEN_TYPES.VOPRF.value]
+                : this.issuers[TOKEN_TYPES.BLIND_RSA.value];
         for (const issuer of issuers) {
             // "truncated_token_key_id" is the least significant byte of the
             // token_key_id in network byte order (in other words, the
