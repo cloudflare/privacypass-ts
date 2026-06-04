@@ -24,7 +24,7 @@ import vectorsRust from './test_data/pub_verif_rfc9578.rust.json';
 const vectors = [...vectorsGo, ...vectorsRust];
 
 import { keysFromVector, type Vectors } from './pub_verif_token.js';
-import { convertEncToRSASSAPSS } from '../src/util.js';
+import { convertEncToRSASSAPSS } from '../src/rsa_util.js';
 
 describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
     const params = [[], [{ supportsRSARAW: true }]];

@@ -2,7 +2,7 @@
 // Licensed under the Apache-2.0 license found in the LICENSE file or at https://opensource.org/licenses/Apache-2.0
 
 import { base64url } from 'rfc4648';
-import { WWWAuthenticateHeader, type TokenTypeEntry } from './auth_scheme/private_token.js';
+import { WWWAuthenticateHeader } from './auth_scheme/private_token.js';
 import {
     Client as PublicVerifClient,
     BLIND_RSA,
@@ -11,9 +11,9 @@ import {
 } from './pub_verif_token.js';
 import { Client as PrivateVerifClient, VOPRF } from './priv_verif_token.js';
 import { fetchToken, type PrivacyPassClient } from './issuance.js';
-import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from './util.js';
+export { tokenEntryToSerializedLength } from './token_types.js';
+import { tokenRequestToTokenTypeEntry as tokenRequestToTokenTypeEntryBase } from './token_types.js';
 
-export const util = { convertEncToRSASSAPSS, convertRSASSAPSSToEnc };
 export * from './auth_scheme/private_token.js';
 export * from './issuance.js';
 export * as genericBatched from './generic_batched_token.js';
@@ -34,6 +34,10 @@ export const TOKEN_TYPES = {
     // Token Type VOPRF (P-384, SHA-384)
     VOPRF,
 } as const;
+
+export function tokenRequestToTokenTypeEntry(bytes: Uint8Array) {
+    return tokenRequestToTokenTypeEntryBase(bytes, TOKEN_TYPES);
+}
 
 // The Privacy Pass HTTP Authentication Scheme
 //
@@ -82,33 +86,4 @@ export async function header_to_token(header: string): Promise<string | null> {
     const authHeader = await fetchToken(client, pt);
     const encodedToken = base64url.stringify(te.encode(authHeader.toString()));
     return encodedToken;
-}
-
-export function tokenEntryToSerializedLength(tokenType: TokenTypeEntry): number {
-    // TokenRequest structure: 2-byte token_type + 1-byte truncated_token_key_id + blinded_msg
-    const headerLen = 3; // token_type (2) + truncated_token_key_id (1)
-    switch (tokenType.value) {
-        case TOKEN_TYPES.VOPRF.value:
-            return headerLen + VOPRF.Ne;
-        case TOKEN_TYPES.BLIND_RSA.value:
-            return headerLen + BLIND_RSA.Nk;
-        case TOKEN_TYPES.PARTIALLY_BLIND_RSA.value:
-            return headerLen + PARTIALLY_BLIND_RSA.Nk;
-        default:
-            throw new Error(`unrecognized or non-supported token type: ${tokenType.value}`);
-    }
-}
-
-export function tokenRequestToTokenTypeEntry(bytes: Uint8Array): TokenTypeEntry {
-    // All token requests have a 2-byte value at the beginning of the token describing TokenTypeEntry.
-    const input = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-
-    const type = input.getUint16(0);
-    const tokenType = Object.values(TOKEN_TYPES).find((t) => t.value === type);
-
-    if (tokenType === undefined) {
-        throw new Error(`unrecognized or non-supported token type: ${type}`);
-    }
-
-    return tokenType;
 }

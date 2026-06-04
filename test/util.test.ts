@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/util.js';
+import { convertEncToRSASSAPSS, convertRSASSAPSSToEnc } from '../src/rsa_util.js';
 
 describe('RSA-PSS', () => {
     it('should export a key', async () => {

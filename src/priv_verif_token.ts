@@ -23,7 +23,7 @@ import {
     type TokenTypeValue,
 } from './auth_scheme/private_token.js';
 import { joinAll } from './util.js';
-import { TOKEN_TYPES } from './index.js';
+import { VOPRF_TOKEN_TYPE } from './token_types.js';
 
 export interface VOPRFExtraParams {
     suite: SuiteID;
@@ -57,12 +57,7 @@ const VOPRF_EXTRA_PARAMS: VOPRFExtraParams = {
 //
 // https://datatracker.ietf.org/doc/html/draft-ietf-privacypass-protocol-16#name-token-type-voprf-p-384-sha-
 export const VOPRF: Readonly<TokenTypeEntry> & VOPRFExtraParams = {
-    value: 0x0001,
-    name: 'VOPRF (P-384, SHA-384)',
-    Nid: 32,
-    publicVerifiable: false,
-    publicMetadata: false,
-    privateMetadata: false,
+    ...VOPRF_TOKEN_TYPE,
     ...VOPRF_EXTRA_PARAMS,
 } as const;
 
@@ -139,7 +134,7 @@ export class TokenResponse {
     //     uint8_t evaluate_proof[Ns+Ns];
     //  } TokenResponse;
 
-    public readonly tokenType: number = TOKEN_TYPES.VOPRF.value;
+    public readonly tokenType: number = VOPRF.value;
 
     constructor(
         public readonly evaluateMsg: Uint8Array,
