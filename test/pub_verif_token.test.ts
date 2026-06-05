@@ -8,6 +8,8 @@ import {
     TOKEN_TYPES,
     Token,
     AuthorizationHeader,
+    WWWAuthenticateHeader,
+    header_to_token,
     publicVerif,
     tokenRequestToTokenTypeEntry,
 } from '../src/index.js';
@@ -83,6 +85,63 @@ describe.each(vectors)('PublicVerifiable-Vector-%#', (v: Vectors) => {
         expect(parsedToken.token.authInput.tokenType).toBe(token.authInput.tokenType);
         expect(parsedToken.token.authenticator).toEqual(token.authenticator);
     });
+});
+
+test('header_to_token returns an Authorization header value', async () => {
+    const v = vectors[0];
+    const [{ privateKey, publicKey }, publicKeyEnc] = await keysFromVector(v);
+    const salt = hexToUint8(v.salt);
+    const mode =
+        salt.length == (BlindRSAMode.PSS as number) ? BlindRSAMode.PSS : BlindRSAMode.PSSZero;
+    const nonce = hexToUint8(v.nonce);
+    const blind = hexToUint8(v.blind);
+    const tokChl = TokenChallenge.deserialize(hexToUint8(v.token_challenge));
+    const issuer = new Issuer(mode, tokChl.issuerName, privateKey, publicKey);
+
+    vi.spyOn(crypto, 'getRandomValues')
+        .mockReturnValueOnce(nonce)
+        .mockReturnValueOnce(salt)
+        .mockReturnValueOnce(blind);
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url =
+                input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+            if (url === `https://${tokChl.issuerName}/.well-known/private-token-issuer-directory`) {
+                return new Response(
+                    JSON.stringify({
+                        'issuer-request-uri': `https://${tokChl.issuerName}/issuer`,
+                        'token-keys': [],
+                    }),
+                    { status: 200 },
+                );
+            }
+
+            if (
+                url !== `https://${tokChl.issuerName}/issuer` ||
+                !(init?.body instanceof Uint8Array)
+            ) {
+                return new Response(null, { status: 404 });
+            }
+
+            const tokenRequest = TokenRequest.deserialize(TOKEN_TYPES.BLIND_RSA, init.body);
+            const tokenResponse = await issuer.issue(tokenRequest);
+            return new Response(tokenResponse.serialize(), {
+                status: 200,
+                headers: { 'Content-Type': 'application/private-token-response' },
+            });
+        }),
+    );
+
+    const challengeHeader = new WWWAuthenticateHeader(tokChl, publicKeyEnc).toString();
+    const authHeader = await header_to_token(challengeHeader);
+
+    expect(authHeader).not.toBeNull();
+    if (authHeader === null) {
+        return;
+    }
+    expect(authHeader.startsWith('PrivateToken token=')).toBe(true);
+    expect(AuthorizationHeader.parse(TOKEN_TYPES.BLIND_RSA, authHeader)).toHaveLength(1);
 });
 
 describe('getPublicKeyBytes', () => {
