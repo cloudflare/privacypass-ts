@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # Required for OIDC token used by npm trusted publishers
 
 jobs:
   release:
